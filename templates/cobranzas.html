@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Finanzas{% endblock %}
+{% block subtitle %}Gestión de cuentas por cobrar y liquidez{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('cobranzas', ver='deudas') }}" class="btn btn-sm {{ 'btn-dark' if request.args.get('ver') != 'todos' else 'btn-light border' }}">
+                Pendientes de Pago
+            </a>
+            <a href="{{ url_for('cobranzas', ver='todos') }}" class="btn btn-sm {{ 'btn-dark' if request.args.get('ver') == 'todos' else 'btn-light border' }}">
+                Histórico Completo
+            </a>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table align-middle table-hover">
+            <thead>
+                <tr>
+                    <th class="ps-4">Referencia</th>
+                    <th>Cliente</th>
+                    <th>Vendedor</th>
+                    <th class="text-end">Monto Total</th>
+                    <th style="width: 20%;">Progreso Pago</th>
+                    <th class="text-end">Saldo Pendiente</th>
+                    <th class="text-end pe-4">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in ordenes %}
+                {% set deuda = o.total - o.monto_pagado %}
+                {% set porcentaje = (o.monto_pagado / o.total) * 100 if o.total > 0 else 0 %}
+                
+                <tr>
+                    <td class="ps-4">
+                        <span class="fw-bold font-monospace text-primary">COT-{{ "%04d"|format(o.id) }}</span>
+                        <div class="small text-muted">{{ o.fecha.strftime('%d/%m/%Y') }}</div>
+                    </td>
+                    <td>
+                        <div class="fw-bold">{{ o.cliente.nombre }}</div>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle bg-light border d-flex justify-content-center align-items-center" style="width: 24px; height: 24px; font-size: 0.7rem;">
+                                {{ o.vendedor.username[0]|upper }}
+                            </div>
+                            <span class="small">{{ o.vendedor.username }}</span>
+                        </div>
+                    </td>
+                    <td class="text-end fw-bold">S/ {{ "%.2f"|format(o.total) }}</td>
+                    <td>
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="fw-bold {{ 'text-success' if porcentaje == 100 else 'text-warning' }}">
+                                {{ o.estado_pago }}
+                            </span>
+                            <span class="text-muted">{{ "%.0f"|format(porcentaje) }}%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar {{ 'bg-success' if porcentaje == 100 else 'bg-warning' }}" 
+                                 role="progressbar" style="width: {{ porcentaje }}%"></div>
+                        </div>
+                    </td>
+                    <td class="text-end">
+                        {% if deuda > 0.1 %}
+                            <span class="text-danger fw-bold">S/ {{ "%.2f"|format(deuda) }}</span>
+                        {% else %}
+                            <span class="text-muted small">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4">
+                        {% if deuda > 0.1 %}
+                        <button onclick="abrirCobro('{{o.id}}', '{{o.cliente.nombre}}', '{{deuda}}')" 
+                                class="btn btn-sm btn-primary">
+                            <i class="bi bi-cash"></i> Cobrar
+                        </button>
+                        {% else %}
+                        <span class="badge badge-success">
+                            <i class="bi bi-check-lg"></i> Cancelado
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5">
+                        <div class="text-muted opacity-50 mb-2"><i class="bi bi-inbox fs-1"></i></div>
+                        <p class="text-muted">No hay registros para mostrar</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "modales/modal_cobro.html" ignore missing %}
+<script>
+    function abrirCobro(id, cliente, deuda) {
+        document.getElementById('cobro_id').value = id;
+        document.getElementById('cobro_cliente').innerText = cliente;
+        document.getElementById('cobro_deuda').innerText = parseFloat(deuda).toFixed(2);
+        // ... resto de tu lógica JS
+        new bootstrap.Modal(document.getElementById('modalCobro')).show();
+    }
+</script>
+{% endblock %}

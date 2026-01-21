@@ -1,0 +1,22 @@
+# Archivos compilados de Python (Basura)
+__pycache__/
+*.pyc
+
+# Base de datos local (Se genera con setup_db.py)
+instance/
+*.db
+
+# Archivos generados por el uso (Resultados)
+Cotizacion_*.docx
+prediccion*.pdf
+*.pdf
+
+# Carpetas temporales
+uploads/
+venv/
+.vscode/
+
+# Excel (Opcional: Si quieres subir el de datos masivos, pon un # al inicio de la siguiente linea)
+# *.xlsx
+# Pero queremos ignorar las plantillas descargadas temporales:
+plantilla_importacion.xlsx

@@ -1,0 +1,147 @@
+:root {
+    --sidebar-width: 250px;
+    --sidebar-collapsed-width: 70px;
+    --header-height: 60px;
+    --primary-color: #0F172A; /* Color oscuro profesional */
+}
+
+body {
+    background-color: #f1f5f9;
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden; /* Evita scroll horizontal indeseado en móvil */
+}
+
+/* --- SIDEBAR (Menú Lateral) --- */
+.sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: var(--primary-color);
+    color: white;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-brand {
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    font-weight: 700;
+    font-size: 1.2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    white-space: nowrap; /* Evita que el texto baje de línea al colapsar */
+    overflow: hidden;
+}
+
+.nav-link {
+    color: rgba(255,255,255,0.7);
+    padding: 0.8rem 1.5rem;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: 0.2s;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: white;
+    background: rgba(255,255,255,0.1);
+    border-left: 4px solid #3b82f6; /* Acento azul */
+}
+
+.nav-link i {
+    font-size: 1.1rem;
+    min-width: 30px; /* Espacio fijo para el ícono */
+}
+
+.nav-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    padding: 1rem 1.5rem 0.5rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* --- CONTENIDO PRINCIPAL --- */
+.main-content {
+    margin-left: var(--sidebar-width);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    min-height: 100vh;
+}
+
+.topbar {
+    height: var(--header-height);
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* --- ESTADO COLAPSADO (Solo Iconos - Desktop) --- */
+body.sidebar-toggled .sidebar {
+    width: var(--sidebar-collapsed-width);
+}
+
+body.sidebar-toggled .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+body.sidebar-toggled .sidebar .nav-link span, 
+body.sidebar-toggled .sidebar .nav-title,
+body.sidebar-toggled .sidebar .user-info-text,
+body.sidebar-toggled .sidebar-brand span {
+    display: none; /* Oculta textos */
+}
+
+body.sidebar-toggled .sidebar .sidebar-brand {
+    justify-content: center;
+    padding: 0;
+}
+
+body.sidebar-toggled .sidebar .nav-link {
+    justify-content: center;
+    padding: 0.8rem 0;
+}
+
+/* --- RESPONSIVE MÓVIL (Celular) --- */
+@media (max-width: 768px) {
+    .sidebar {
+        margin-left: calc(var(--sidebar-width) * -1); /* Esconder menú a la izquierda */
+    }
+    
+    .main-content {
+        margin-left: 0; /* Contenido ocupa todo el ancho */
+        padding: 1rem;
+    }
+
+    /* Cuando el menú está activo en móvil */
+    body.sidebar-mobile-show .sidebar {
+        margin-left: 0;
+        width: var(--sidebar-width); /* En móvil siempre ancho completo al abrir */
+    }
+    
+    /* Fondo oscuro al abrir menú en móvil */
+    .mobile-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+    }
+    
+    body.sidebar-mobile-show .mobile-overlay {
+        display: block;
+    }
+}

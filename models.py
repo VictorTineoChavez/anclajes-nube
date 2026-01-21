@@ -1,0 +1,169 @@
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+
+db = SQLAlchemy()
+
+# --- 1. CATEGORÍAS ---
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), unique=True, nullable=False)
+    prefijo = db.Column(db.String(5), unique=True, nullable=False) 
+    contador = db.Column(db.Integer, default=0) 
+
+# --- 2. USUARIOS ---
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    nombre_completo = db.Column(db.String(100), nullable=False) 
+    role = db.Column(db.String(20), nullable=False) 
+    celular = db.Column(db.String(20))
+    cargo_formal = db.Column(db.String(100)) # NUEVO
+    email_empresa = db.Column(db.String(100)) # NUEVO
+
+# --- 3. PRODUCTOS ---
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sku = db.Column(db.String(50), unique=True, nullable=False) 
+    nombre = db.Column(db.String(200), nullable=False) 
+    categoria = db.Column(db.String(100), nullable=False) 
+    calidad = db.Column(db.String(100)) 
+    ubicacion = db.Column(db.String(100))
+    stock_actual = db.Column(db.Integer, default=0)
+    stock_minimo = db.Column(db.Integer, default=10)
+    
+    unidades_por_caja = db.Column(db.Integer, default=100)
+    precio_unidad = db.Column(db.Float, default=0.0)
+    precio_docena = db.Column(db.Float, default=0.0)
+    precio_caja = db.Column(db.Float, default=0.0)
+    costo_referencial = db.Column(db.Float, default=0.0)
+
+# --- 4. KARDEX ---
+class ProductMovement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    tipo = db.Column(db.String(10)) 
+    cantidad = db.Column(db.Integer, nullable=False)
+    stock_anterior = db.Column(db.Integer)
+    stock_nuevo = db.Column(db.Integer)
+    motivo = db.Column(db.String(200))
+
+    product = db.relationship('Product', backref='movements')
+    user = db.relationship('User', backref='movements')
+
+# --- 5. CLIENTES ---
+class Client(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    documento = db.Column(db.String(20), unique=True, nullable=False)
+    nombre = db.Column(db.String(100), nullable=False)
+    telefono = db.Column(db.String(20))
+    direccion = db.Column(db.String(200))
+    estado = db.Column(db.String(50), default='ACTIVO')      
+    condicion = db.Column(db.String(50), default='HABIDO')   
+    last_updated = db.Column(db.DateTime, default=datetime.now)
+    updated_by = db.Column(db.String(50), default='Sistema')
+
+# --- 6. ORDENES ---
+class Order(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    vendedor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    estado = db.Column(db.String(20), default='Pendiente')
+    
+    atencion = db.Column(db.String(100)) 
+    orden_compra = db.Column(db.String(50)) 
+
+    # Nuevos campos Cotización
+    condicion_pago = db.Column(db.String(50))
+    validez_oferta = db.Column(db.String(50))
+    plazo_entrega_texto = db.Column(db.String(100))
+    observacion = db.Column(db.Text)
+
+    moneda = db.Column(db.String(5), default='PEN') 
+    tipo_cambio = db.Column(db.Float, default=1.0)  
+    
+    subtotal = db.Column(db.Float, default=0.0)
+    igv = db.Column(db.Float, default=0.0)
+    total = db.Column(db.Float, default=0.0)
+    
+    tipo_entrega = db.Column(db.String(20)) 
+    direccion_envio = db.Column(db.String(200))
+    fecha_entrega = db.Column(db.Date)
+    
+    monto_pagado = db.Column(db.Float, default=0.0)
+    estado_pago = db.Column(db.String(20), default='Pendiente') 
+    
+    cliente = db.relationship('Client', backref='orders')
+    vendedor = db.relationship('User', backref='orders')
+
+    descuento_tipo = db.Column(db.String(10), default='MONTO') # 'PORCENTAJE' o 'MONTO'
+    descuento_valor = db.Column(db.Float, default=0.0)         # El número ingresado (ej. 5 o 100)
+    descuento_total = db.Column(db.Float, default=0.0)         # El dinero real descontado   
+
+# --- 7. DETALLE DE ORDEN (Aquí estaba el problema) ---
+class OrderDetail(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    
+    # Puede ser NULL si es Fabricación o GLB puro
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+    
+    # Nuevos campos para manejar tipos
+    item_type = db.Column(db.String(20), default='PRODUCTO') # PRODUCTO, FABRICACION, GLB
+    nombre_personalizado = db.Column(db.String(200)) 
+    
+    cantidad = db.Column(db.Integer, nullable=False)
+    precio_aplicado = db.Column(db.Float, nullable=False)
+    tipo_precio_usado = db.Column(db.String(50))
+    subtotal = db.Column(db.Float, nullable=False)
+    
+    product = db.relationship('Product')
+    
+    # ¡ESTA LÍNEA FALTABA! Sin ella, orden.details da error
+    order = db.relationship('Order', backref='details') 
+    
+    # Relación con componentes del kit
+    kit_components = db.relationship('OrderKitComponent', backref='parent_detail', cascade="all, delete-orphan")
+
+    nombre_personalizado = db.Column(db.String(200)) # Este guardará la descripción NORMAL
+    
+    # NUEVO CAMPO:
+    nombre_personalizado_titulo = db.Column(db.String(200)) # Este guardará la parte en NEGRITA
+
+# --- 8. COMPONENTES DE KIT (GLB) ---
+class OrderKitComponent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_detail_id = db.Column(db.Integer, db.ForeignKey('order_detail.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False) 
+    cantidad_requerida = db.Column(db.Integer, nullable=False)
+
+    product = db.relationship('Product')
+
+class Payment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    monto = db.Column(db.Float, nullable=False)
+    metodo = db.Column(db.String(50))
+    nota = db.Column(db.String(200))
+    
+    order = db.relationship('Order', backref='payments')
+
+class SystemConfig(db.Model):
+    key = db.Column(db.String(50), primary_key=True)
+    value = db.Column(db.String(255))               
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+    updated_by = db.Column(db.String(50), default='Sistema')
+
+class AuditLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    accion = db.Column(db.String(255), nullable=False)
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    icono = db.Column(db.String(50), default='bi-info-circle')
+    color = db.Column(db.String(20), default='text-primary')
+    
+    usuario = db.relationship('User', backref=db.backref('logs', lazy=True))

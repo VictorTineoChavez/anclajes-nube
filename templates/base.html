@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>ImportBolts | Enterprise ERP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/enterprise.css') }}">
+</head>
+<body>
+
+    {% if session.get('user_id') %}
+    
+    <div class="mobile-overlay" onclick="toggleSidebar()"></div>
+
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-box-seam-fill text-info me-2 fs-4"></i> 
+            <span>IMPORTBOLTS</span>
+        </div>
+
+        <div class="overflow-auto flex-grow-1">
+            <div class="nav flex-column py-3">
+                <div class="nav-title">Principal</div>
+                <a href="{{ url_for('index') }}" class="nav-link {{ 'active' if request.endpoint == 'index' }}">
+                    <i class="bi bi-grid-1x2"></i> <span class="ms-2">Dashboard</span>
+                </a>
+                <a href="{{ url_for('inventario') }}" class="nav-link {{ 'active' if request.endpoint == 'inventario' }}">
+                    <i class="bi bi-boxes"></i> <span class="ms-2">Inventario</span>
+                </a>
+
+                {% if session.get('role') in ['admin', 'vendedor', 'administracion'] %}
+                <div class="nav-title">Comercial</div>
+                <a href="{{ url_for('nueva_venta') }}" class="nav-link {{ 'active' if request.endpoint == 'nueva_venta' }}">
+                    <i class="bi bi-cart-plus"></i> <span class="ms-2">Nueva Cotización</span>
+                </a>
+                <a href="{{ url_for('historial_ventas') }}" class="nav-link {{ 'active' if request.endpoint == 'historial_ventas' }}">
+                    <i class="bi bi-receipt"></i> <span class="ms-2">Historial Ventas</span>
+                </a>
+                {% endif %}
+
+                {% if session.get('role') in ['admin', 'almacen'] %}
+                <div class="nav-title">Logística</div>
+                <a href="{{ url_for('ver_kardex') }}" class="nav-link {{ 'active' if request.endpoint == 'ver_kardex' }}">
+                    <i class="bi bi-clock-history"></i> <span class="ms-2">Kardex</span>
+                </a>
+                <a href="{{ url_for('despachos') }}" class="nav-link {{ 'active' if request.endpoint == 'despachos' }}">
+                    <i class="bi bi-truck"></i> <span class="ms-2">Despachos</span>
+                </a>
+                {% endif %}
+
+                {% if session.get('role') in ['admin', 'administracion'] %}
+                <div class="nav-title">Gestión</div>
+                <a href="{{ url_for('cobranzas') }}" class="nav-link {{ 'active' if request.endpoint == 'cobranzas' }}">
+                    <i class="bi bi-wallet2"></i> <span class="ms-2">Cobranzas</span>
+                </a>
+                <a href="{{ url_for('reportes_predicciones') }}" class="nav-link {{ 'active' if request.endpoint == 'reportes_predicciones' }}">
+                    <i class="bi bi-graph-up-arrow"></i> <span class="ms-2">BI & Predicciones</span>
+                </a>
+                {% endif %}
+                
+                {% if session.get('role') == 'admin' %}
+                <div class="nav-title">Sistema</div>
+                <a href="{{ url_for('gestion_usuarios') }}" class="nav-link {{ 'active' if request.endpoint == 'gestion_usuarios' }}">
+                    <i class="bi bi-people"></i> <span class="ms-2">Usuarios</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="border-top border-secondary border-opacity-25 p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2 overflow-hidden">
+                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0" style="width: 32px; height: 32px;">
+                        {{ session.get('username')[0]|upper }}
+                    </div>
+                    <div class="user-info-text overflow-hidden">
+                        <div class="text-white fw-medium text-truncate small">{{ session.get('username') }}</div>
+                        <div class="text-white-50 small text-uppercase" style="font-size: 0.65rem;">{{ session.get('role') }}</div>
+                    </div>
+                </div>
+                <a href="{{ url_for('logout') }}" class="text-white-50 hover-white" title="Salir">
+                    <i class="bi bi-box-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="topbar">
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-light border btn-sm" id="btnToggle" onclick="toggleSidebar()">
+                    <i class="bi bi-list fs-5"></i>
+                </button>
+                <div>
+                    <h5 class="mb-0 text-dark fw-bold">
+                        {% block title %}ImportBolts ERP{% endblock %}
+                    </h5>
+                    <small class="text-muted d-none d-md-block">{% block subtitle %}{% endblock %}</small>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-3">
+                <div class="dropdown">
+                    <a class="btn btn-light border bg-white text-muted position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-bell-fill"></i>
+                        
+                        {% if alertas_stock > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                            <span class="visually-hidden">Alertas</span>
+                        </span>
+                        {% endif %}
+                    </a>
+
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-0" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                        <li class="bg-light p-2 border-bottom d-flex justify-content-between align-items-center">
+                            <span class="small fw-bold text-uppercase text-muted ms-2">Actividad Reciente</span>
+                            <span class="badge bg-primary rounded-pill">{{ historial|length }}</span>
+                        </li>
+
+                        {% if alertas_stock > 0 %}
+                        <li>
+                            <a class="dropdown-item py-2 bg-danger bg-opacity-10" href="{{ url_for('inventario', stock_bajo='on') }}">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-exclamation-triangle-fill text-danger fs-4 me-3"></i>
+                                    <div>
+                                        <strong class="text-danger small">Stock Crítico Detectado</strong>
+                                        <div class="text-muted" style="font-size: 0.75rem;">
+                                            {{ alertas_stock }} productos requieren reposición.
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% if historial %}
+                            <li><hr class="dropdown-divider my-0"></li>
+                            {% for log in historial %}
+                            <li>
+                                <div class="dropdown-item py-2" style="cursor: default;">
+                                    <div class="d-flex">
+                                        <i class="{{ log.icono }} {{ log.color }} fs-5 me-3 mt-1"></i>
+                                        <div>
+                                            <div class="text-dark small fw-medium">{{ log.accion }}</div>
+                                            <div class="text-muted" style="font-size: 0.65rem;">
+                                                {{ log.usuario.username }} • {{ log.fecha.strftime('%d/%m %H:%M') }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <li class="text-center py-4 text-muted small">
+                                <i class="bi bi-clock-history d-block mb-1 fs-4"></i>
+                                Sin actividad reciente
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            </header>
+
+        <div class="container-fluid px-0">
+            <div id="flash-messages" data-messages='{{ get_flashed_messages() | tojson }}'></div>
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    {% else %}
+    <div class="d-flex min-vh-100 align-items-center justify-content-center bg-light">
+        {% block login_content %}{% endblock %}
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Lógica del Menú
+        function toggleSidebar() {
+            const body = document.body;
+            if (window.innerWidth <= 768) {
+                body.classList.toggle('sidebar-mobile-show');
+            } else {
+                body.classList.toggle('sidebar-toggled');
+            }
+        }
+
+        // Alertas SweetAlert
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashDiv = document.getElementById('flash-messages');
+            if(flashDiv && flashDiv.dataset.messages) {
+                const messages = JSON.parse(flashDiv.dataset.messages);
+                messages.forEach(msg => {
+                    const isError = msg.toLowerCase().includes('error') || msg.toLowerCase().includes('⛔');
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: isError ? 'error' : 'success',
+                        title: msg,
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0 fw-bold"><i class="bi bi-briefcase text-primary"></i> Gestión Comercial</h2>
+        <p class="text-muted small mb-0">Flujo: Cotización ➝ Aprobación ➝ Nota de Pedido</p>
+    </div>
+    <a href="{{ url_for('nueva_venta') }}" class="btn btn-success shadow-sm">
+        <i class="bi bi-plus-lg"></i> Nueva Cotización
+    </a>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="salesTabs">
+    <li class="nav-item">
+        <a class="nav-link {% if not request.args.get('vista') %}active{% endif %}" href="{{ url_for('historial_ventas') }}">
+            <i class="bi bi-journal-text"></i> Todo el Historial
+        </a>
+    </li>
+    
+    {% if session.get('role') in ['admin', 'administracion'] %}
+    <li class="nav-item">
+        <a class="nav-link text-warning fw-bold {% if request.args.get('vista') == 'por_aprobar' %}active bg-warning bg-opacity-10{% endif %}" 
+           href="{{ url_for('historial_ventas', vista='por_aprobar') }}">
+            <i class="bi bi-hourglass-split"></i> Por Aprobar
+            {% if pendientes_count > 0 %}
+                <span class="badge bg-danger rounded-pill ms-1">{{ pendientes_count }}</span>
+            {% endif %}
+        </a>
+    </li>
+    {% endif %}
+</ul>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light small text-uppercase text-muted">
+                <tr>
+                    <th class="ps-4">Documento</th>
+                    <th>Emisión</th>
+                    <th>Cliente</th>
+                    <th>Vendedor</th>
+                    <th class="text-end">Monto Total</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-center">Gestión</th>
+                </tr>
+            </thead>
+            <tbody class="small">
+                {% for o in ordenes %}
+                <tr>
+                    <td class="ps-4">
+                        {% if o.estado == 'Aprobado' or o.estado == 'Despachado' or o.estado == 'Entregado' %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">NP-{{ "%05d"|format(o.id) }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border">COT-{{ "%05d"|format(o.id) }}</span>
+                        {% endif %}
+                    </td>
+
+                    <td>{{ o.fecha.strftime('%d/%m %H:%M') }}</td>
+                    
+                    <td class="fw-bold text-truncate" style="max-width: 220px;">{{ o.cliente.nombre }}</td>
+                    
+                    <td><i class="bi bi-person text-muted"></i> {{ o.vendedor.username }}</td>
+                    
+                    <td class="text-end fw-bold">
+                        {{ "S/" if o.moneda == 'PEN' else "$" }} {{ "%.2f"|format(o.total) }}
+                    </td>
+
+                    <td class="text-center">
+                        {% if o.estado == 'Cotizacion' %}
+                            <span class="badge bg-secondary">Borrador</span>
+                        {% elif o.estado == 'Pendiente Aprobacion' %}
+                            <span class="badge bg-warning text-dark border border-dark animation-pulse">
+                                <i class="bi bi-exclamation-circle"></i> Esperando Gerencia
+                            </span>
+                        {% elif o.estado == 'Aprobado' %}
+                            <span class="badge bg-primary">Nota Pedido</span>
+                        {% elif o.estado == 'Despachado' %}
+                            <span class="badge bg-info text-dark">En Ruta</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-center">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-light border" onclick="verDetalle('{{o.id}}', '{{o.cliente.nombre}}', '{{o.tipo_entrega}}', '{{o.total}}')" title="Ver detalle">
+                                <i class="bi bi-eye"></i>
+                            </button>
+
+                            {% if o.estado == 'Cotizacion' %}
+                                {% if session.get('user_id') == o.vendedor_id or session.get('role') == 'admin' %}
+                                
+                                    <a href="{{ url_for('editar_venta', order_id=o.id) }}" class="btn btn-sm btn-outline-primary" title="Editar / Corregir">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                    
+                                    <button class="btn btn-sm btn-outline-success" onclick="solicitarAprobacion('{{o.id}}')" title="Enviar a Gerencia">
+                                        <i class="bi bi-send"></i>
+                                    </button>
+                                    
+                                    <button class="btn btn-sm btn-outline-danger" onclick="anularOrden('{{o.id}}')" title="Anular">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                {% endif %}
+                            {% endif %}
+
+                            {% if o.estado == 'Pendiente Aprobacion' and session.get('role') in ['admin', 'administracion'] %}
+                                <a href="{{ url_for('editar_venta', order_id=o.id) }}" class="btn btn-sm btn-warning" title="Corregir datos antes de aprobar">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </a>
+                                
+                                <button class="btn btn-sm btn-success fw-bold" onclick="aprobarGerencia('{{o.id}}')" title="APROBAR (Descuenta Stock)">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                
+                                <button class="btn btn-sm btn-danger" onclick="rechazarCotizacion('{{o.id}}')" title="Observar/Rechazar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            {% endif %}
+
+                            <a href="{{ url_for('descargar_cotizacion', order_id=o.id) }}" class="btn btn-sm btn-light border" title="PDF">
+                                <i class="bi bi-file-pdf text-danger"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center py-4 text-muted">No hay registros.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // --- 1. SOLICITUD VENDEDOR ---
+    function solicitarAprobacion(id) {
+        Swal.fire({
+            title: '¿Cliente confirmó?',
+            text: "La cotización se bloqueará y pasará a revisión de gerencia.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Enviar a Aprobación',
+            confirmButtonColor: '#198754'
+        }).then((r) => {
+            if(r.isConfirmed) cambiarEstado(id, 'Pendiente Aprobacion');
+        });
+    }
+
+    // --- 2. APROBACIÓN GERENCIAL (LA IMPORTANTE) ---
+    function aprobarGerencia(id) {
+        Swal.fire({
+            title: 'Generar Nota de Pedido',
+            html: `
+                <div class="alert alert-warning text-start small">
+                    <i class="bi bi-exclamation-triangle-fill"></i> <b>ATENCIÓN:</b><br>
+                    Al aprobar, el sistema <b>descontará el stock automáticamente</b> del inventario.<br>
+                    Esta acción confirma la venta.
+                </div>
+                ¿Está seguro de proceder?
+            `,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Generar NP y Descontar',
+            confirmButtonColor: '#0d6efd',
+            cancelButtonText: 'Cancelar',
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                return fetch(`/gestion_ventas/aprobar/${id}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status !== 'success') throw new Error(data.msg);
+                        return data;
+                    })
+                    .catch(error => Swal.showValidationMessage(`Error: ${error}`));
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire('¡Aprobado!', result.value.msg, 'success').then(() => location.reload());
+            }
+        });
+    }
+
+    function rechazarCotizacion(id) {
+        // Lógica simple para devolver a borrador
+        Swal.fire({
+            title: 'Observar Cotización',
+            input: 'text',
+            inputLabel: 'Motivo',
+            showCancelButton: true,
+            confirmButtonText: 'Devolver a Vendedor'
+        }).then((r) => {
+            if(r.isConfirmed) cambiarEstado(id, 'Cotizacion'); // Vuelve a borrador
+        });
+    }
+
+    function cambiarEstado(id, estado) {
+        // Usar tu ruta antigua o crear una genérica simple para cambios sin movimiento de stock
+        fetch(`/cambiar_estado/${id}/${estado}`).then(() => location.reload());
+    }
+    
+    function verDetalle(id, total) {
+        // Implementar modal simple de vista
+        Swal.fire({ title: `Venta #${id}`, text: `Total: ${total}`, icon: 'info' });
+    }
+</script>
+
+<style>
+    .animation-pulse {
+        animation: pulse-warning 2s infinite;
+    }
+    @keyframes pulse-warning {
+        0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+    }
+</style>
+{% endblock %}
