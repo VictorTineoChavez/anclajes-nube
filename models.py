@@ -103,6 +103,11 @@ class Order(db.Model):
     descuento_valor = db.Column(db.Float, default=0.0)         # El número ingresado (ej. 5 o 100)
     descuento_total = db.Column(db.Float, default=0.0)         # El dinero real descontado   
 
+    observacion = db.Column(db.Text) # Esta es la del Vendedor (Logística)
+    
+    # --- AGREGAR ESTA LÍNEA NUEVA ---
+    motivo_rechazo = db.Column(db.Text) # Esta es EXCLUSIVA para el Gerente
+
 # --- 7. DETALLE DE ORDEN (Aquí estaba el problema) ---
 class OrderDetail(db.Model):
     id = db.Column(db.Integer, primary_key=True)

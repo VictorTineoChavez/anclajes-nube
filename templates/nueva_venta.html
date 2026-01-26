@@ -646,11 +646,9 @@
         const modales = document.querySelectorAll('.modal');
         modales.forEach(m => m.removeAttribute('tabindex'));
         document.body.addEventListener('shown.bs.modal', function (event) { event.target.removeAttribute('tabindex'); });
-
-        
-
         
         // Exponer funciones al window
+        window.iniciarCambioMoneda = iniciarCambioMoneda;
         window.actualizarDolar = actualizarDolar;
         window.buscarClienteApi = buscarClienteApi;
         window.confirmarForzado = confirmarForzado;
@@ -665,6 +663,7 @@
         window.validarEntradaString = validarEntradaString;
         window.limpiarInputCantidad = limpiarInputCantidad;
         window.limpiarInputPrecio = limpiarInputPrecio;
+        window.actualizarFilaSinRedibujar = actualizarFilaSinRedibujar;
         
         window.cambiarModo = cambiarModo;
         window.abrirModalGLB = abrirModalGLB;
@@ -677,6 +676,10 @@
         // NUEVAS FUNCIONES
         window.toggleDireccionEntrega = toggleDireccionEntrega;
         window.verFichaCliente = verFichaCliente;
+
+        window.previsualizarVenta = previsualizarVenta;
+        window.confirmarYGuardar = confirmarYGuardar;
+        window.actualizarTotalesGlobales = actualizarTotalesGlobales;
 
         recalcularCarritoPorMoneda(); 
         inicializarSelect2Cliente(); 
@@ -1935,95 +1938,114 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
         actualizarTotalesGlobales();
     }
 
+// --- REEMPLAZAR ESTA FUNCIÓN EN TU SCRIPT DE nueva_venta.html ---
+
     function confirmarYGuardar() {
-    // Cerrar modal resumen
-    bootstrap.Modal.getInstance(document.getElementById('modalResumenVenta')).hide();
+        // 1. Cerrar modal resumen
+        bootstrap.Modal.getInstance(document.getElementById('modalResumenVenta')).hide();
 
-    // Mostrar cargando
-    Swal.fire({
-        title: 'Generando...', text: 'Por favor espere', 
-        allowOutsideClick: false, 
-        didOpen: () => { Swal.showLoading() } 
-    });
+        // 2. Mostrar cargando
+        Swal.fire({
+            title: 'Procesando...', text: 'Guardando información...', 
+            allowOutsideClick: false, 
+            didOpen: () => { Swal.showLoading() } 
+        });
 
-    // --- CÁLCULOS FINALES PARA ENVÍO ---
-    let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
-    let tipoDesc = $('#tipoDescuento').val(); 
-    let valorDesc = parseFloat($('#inputDescuento').val()) || 0;
-    let montoDescontado = 0;
-    
-    if (tipoDesc === 'PORCENTAJE') montoDescontado = totalItems * (valorDesc / 100);
-    else montoDescontado = valorDesc;
-    if(montoDescontado > totalItems) montoDescontado = totalItems;
-
-    let subtotalNeto = totalItems - montoDescontado;
-    let igv = subtotalNeto * 0.18;
-    let totalFinal = subtotalNeto + igv;
-
-    // Payload
-    const payload = {
-        cliente_ruc: $('#cli_doc_select').val(), 
-        cliente_nombre: $('#cli_nom').val(), 
-        cliente_tel: $('#cli_tel').val(), 
-        cliente_dir: $('#cli_dir').val(),
-        cliente_atte: $('#cli_atte').val(), 
-        orden_compra: $('#cli_oc').val(),
-        condicion_pago: $('#inputCondicionPago').val(), 
-        validez_oferta: $('#inputValidez').val(),
-        plazo_entrega_texto: "", 
-        observacion: $('#inputObservacion').val(),
-        fecha_entrega: $('#inputFechaEntrega').val(), 
-        tipo_entrega: $('#selectEntrega').val(), 
-        direccion_entrega: $('#inputDireccionEntrega').val(),
-        moneda: $('#selectMoneda').val(), 
-        tc: $('#inputTC').val(), 
-        items: carrito, 
+        // 3. Cálculos Finales
+        let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
+        let tipoDesc = $('#tipoDescuento').val(); 
+        let valorDesc = parseFloat($('#inputDescuento').val()) || 0;
+        let montoDescontado = 0;
         
-        subtotal: subtotalNeto, 
-        igv: igv, 
-        total: totalFinal,
+        if (tipoDesc === 'PORCENTAJE') montoDescontado = totalItems * (valorDesc / 100);
+        else montoDescontado = valorDesc;
         
-        descuento_tipo: tipoDesc,
-        descuento_valor: valorDesc,
-        descuento_total: montoDescontado
-    };
-    
-    fetch('/nueva_venta', { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify(payload) 
-    })
-    .then(r => r.json()).then(data => {
-        if(data.status === 'success') {
-            // ÉXITO: MOSTRAR OPCIONES EN LUGAR DE DESCARGA AUTOMÁTICA
-            Swal.fire({
-                title: '¡Cotización Creada!',
-                html: `
-                    <p class="mb-3">Se generó la cotización <strong>#${data.order_id}</strong> exitosamente.</p>
-                    <div class="d-grid gap-2">
-                        <a href="/descargar_cotizacion/${data.order_id}" class="btn btn-primary fw-bold">
-                            <i class="bi bi-file-earmark-pdf-fill"></i> DESCARGAR PDF
-                        </a>
-                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                            <i class="bi bi-house-door"></i> Ir al Inicio
-                        </a>
-                        <button onclick="window.location.reload()" class="btn btn-link text-muted btn-sm">
-                            Nueva Cotización
-                        </button>
-                    </div>
-                `,
-                icon: 'success',
-                showConfirmButton: false, // Quitamos botón OK estandar
-                allowOutsideClick: false
-            });
-        } else { 
-            Swal.fire('Error', data.msg, 'error'); 
+        if(montoDescontado > totalItems) montoDescontado = totalItems;
+
+        let subtotalNeto = totalItems - montoDescontado;
+        let igv = subtotalNeto * 0.18;
+        let totalFinal = subtotalNeto + igv;
+
+        // --- 4. DETECTAR SI ES EDICIÓN (LA CLAVE DEL ARREGLO) ---
+        const orderIdEditing = document.getElementById('hidden_order_id').value;
+        
+        // Determinar URL de destino: Si hay ID es UPDATE, si no es CREATE
+        let urlDestino = '/nueva_venta';
+        if (orderIdEditing && orderIdEditing !== '') {
+            urlDestino = '/actualizar_venta';
         }
-    })
-    .catch(err => {
-        Swal.fire('Error Crítico', 'No se pudo conectar con el servidor', 'error');
-    });
-}
+
+        // --- 5. CONSTRUIR PAYLOAD ---
+        const payload = {
+            order_id: orderIdEditing, // ENVIAMOS EL ID (Vacío si es nuevo, lleno si es edición)
+            
+            cliente_ruc: $('#cli_doc_select').val(), 
+            cliente_nombre: $('#cli_nom').val(), 
+            cliente_tel: $('#cli_tel').val(), 
+            cliente_dir: $('#cli_dir').val(),
+            cliente_atte: $('#cli_atte').val(), 
+            orden_compra: $('#cli_oc').val(),
+            
+            condicion_pago: $('#inputCondicionPago').val(), 
+            validez_oferta: $('#inputValidez').val(),
+            plazo_entrega_texto: "", 
+            observacion: $('#inputObservacion').val(),
+            
+            fecha_entrega: $('#inputFechaEntrega').val(), 
+            tipo_entrega: $('#selectEntrega').val(), 
+            direccion_entrega: $('#inputDireccionEntrega').val(),
+            
+            moneda: $('#selectMoneda').val(), 
+            tc: $('#inputTC').val(), 
+            items: carrito, 
+            
+            subtotal: subtotalNeto, 
+            igv: igv, 
+            total: totalFinal,
+            
+            descuento_tipo: tipoDesc,
+            descuento_valor: valorDesc,
+            descuento_total: montoDescontado
+        };
+        
+        // --- 6. ENVIAR AL SERVIDOR ---
+        fetch(urlDestino, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        })
+        .then(r => r.json()).then(data => {
+            if(data.status === 'success') {
+                // Mensaje diferente si editamos o creamos
+                let tituloMsg = orderIdEditing ? '¡Actualizado!' : '¡Cotización Creada!';
+                let textoMsg = orderIdEditing ? 'La cotización ha sido corregida correctamente.' : `Se generó la cotización #${data.order_id}`;
+
+                Swal.fire({ 
+                    title: tituloMsg, 
+                    html: `
+                        <p class="mb-3">${textoMsg}</p>
+                        <div class="d-grid gap-2">
+                            <a href="/descargar_cotizacion/${data.order_id}" class="btn btn-primary fw-bold">
+                                <i class="bi bi-file-earmark-pdf-fill"></i> DESCARGAR PDF
+                            </a>
+                            <a href="{{ url_for('historial_ventas') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Volver al Historial
+                            </a>
+                        </div>
+                    `,
+                    icon: 'success',
+                    showConfirmButton: false,
+                    allowOutsideClick: false
+                });
+            } else { 
+                Swal.fire('Error', data.msg, 'error'); 
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            Swal.fire('Error Crítico', 'No se pudo conectar con el servidor', 'error');
+        });
+    }
 
     function actualizarDolar(forzar = false) {
         const btn = document.querySelector('button[title="Consultar SUNAT"]'); if(btn) btn.disabled = true;
@@ -2234,8 +2256,27 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
         mostrarModalResumen();
     }
 
+function mostrarModalResumen() {
+        $('#res_cliente').text($('#cli_nom').val());
+        $('#res_ruc').text($('#cli_doc_select').val());
+        let dir = $('#inputDireccionEntrega').val();
+        if($('#selectEntrega').val() === 'Recojo') dir = "RECOJO EN TIENDA";
+        $('#res_direccion').text(dir || '-');
+
+        const tbody = $('#tablaResumenBody'); tbody.empty();
+        carrito.forEach(item => {
+            let alertaStock = (item.tipo === 'PRODUCTO' && item.cantidad > item.stock) ? '<i class="bi bi-exclamation-circle-fill text-warning ms-1" title="Sin Stock"></i>' : '';
+            tbody.append(`<tr><td>${item.nombre} ${alertaStock}</td><td class="text-center fw-bold">${item.cantidad}</td><td class="text-end">${item.precio.toFixed(2)}</td><td class="text-end fw-bold">${item.subtotal.toFixed(2)}</td></tr>`);
+        });
+
+        $('#res_neto').text($('#lblSubtotalNeto').text());
+        $('#res_igv').text($('#lblIGV').text());
+        $('#res_total').text($('#lblTotal').text());
+        new bootstrap.Modal(document.getElementById('modalResumenVenta')).show();
+    }
+
     // --- FUNCIÓN AUXILIAR PARA MOSTRAR EL MODAL FINAL ---
-function enviarDatosBackend() {
+    function enviarDatosBackend() {
         // --- 1. CÁLCULOS FINALES EN JS (Para enviar estructura, el Backend recalcula por seguridad) ---
         let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
         

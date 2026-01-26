@@ -1,167 +1,626 @@
-{% extends "base.html" %}
+{% extends "base.html" %}form
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2 class="mb-0 fw-bold"><i class="bi bi-briefcase text-primary"></i> Gestión Comercial</h2>
-        <p class="text-muted small mb-0">Flujo: Cotización ➝ Aprobación ➝ Nota de Pedido</p>
+        <h2 class="mb-0 fw-bold"><i class="bi bi-kanban text-primary"></i> Gestión Comercial</h2>
+        <p class="text-muted small mb-0">Administración de flujo de ventas</p>
     </div>
-    <a href="{{ url_for('nueva_venta') }}" class="btn btn-success shadow-sm">
-        <i class="bi bi-plus-lg"></i> Nueva Cotización
+    <a href="{{ url_for('nueva_venta') }}" class="btn btn-success shadow-sm px-4 fw-bold">
+        <i class="bi bi-plus-lg"></i> NUEVA COTIZACIÓN
     </a>
 </div>
 
-<ul class="nav nav-tabs mb-3" id="salesTabs">
-    <li class="nav-item">
-        <a class="nav-link {% if not request.args.get('vista') %}active{% endif %}" href="{{ url_for('historial_ventas') }}">
-            <i class="bi bi-journal-text"></i> Todo el Historial
-        </a>
-    </li>
+<ul class="nav nav-pills mb-3 gap-2 p-2 bg-white rounded shadow-sm">
     
-    {% if session.get('role') in ['admin', 'administracion'] %}
     <li class="nav-item">
-        <a class="nav-link text-warning fw-bold {% if request.args.get('vista') == 'por_aprobar' %}active bg-warning bg-opacity-10{% endif %}" 
-           href="{{ url_for('historial_ventas', vista='por_aprobar') }}">
-            <i class="bi bi-hourglass-split"></i> Por Aprobar
-            {% if pendientes_count > 0 %}
-                <span class="badge bg-danger rounded-pill ms-1">{{ pendientes_count }}</span>
+        <a class="nav-link {% if vista_actual == 'borradores' and not request.args.get('busqueda') %}active{% endif %}" 
+           href="{{ url_for('historial_ventas', vista='borradores') }}">
+            <i class="bi bi-pencil-square"></i> En Proceso
+            {% if cuentas.obs > 0 and session.get('role') == 'vendedor' %}
+                <span class="badge bg-danger ms-2 blink-anim">! {{ cuentas.obs }} DEVUELTOS</span>
             {% endif %}
         </a>
     </li>
-    {% endif %}
+
+    <li class="nav-item">
+        <a class="nav-link {% if vista_actual == 'revision' %}active{% endif %}" 
+           href="{{ url_for('historial_ventas', vista='revision') }}">
+            <i class="bi bi-hourglass-split"></i> Por Aprobar
+            {% if cuentas.rev > 0 %}
+                <span class="badge bg-warning text-dark ms-1">{{ cuentas.rev }}</span>
+            {% endif %}
+        </a>
+    </li>
+
+    <li class="nav-item">
+        <a class="nav-link {% if vista_actual == 'activos' %}active{% endif %}" 
+           href="{{ url_for('historial_ventas', vista='activos') }}">
+            <i class="bi bi-box-seam"></i> Notas de Pedido / Ruta
+        </a>
+    </li>
+
+    <li class="nav-item ms-auto">
+        <a class="nav-link text-secondary {% if vista_actual == 'cerrados' %}active bg-secondary text-white{% endif %}" 
+           href="{{ url_for('historial_ventas', vista='cerrados') }}">
+            <i class="bi bi-archive"></i> Historial Cerrado
+        </a>
+    </li>
 </ul>
+
+<div class="card mb-4 bg-light border-0 shadow-sm">
+    <div class="card-body py-3">
+        <form class="row g-2 align-items-end" method="GET" action="{{ url_for('historial_ventas') }}">
+            <input type="hidden" name="vista" value="{{ vista_actual }}">
+
+            <div class="col-md-3">
+                <label class="small fw-bold text-muted">Buscador Texto</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="text" name="busqueda" class="form-control" 
+                        placeholder="N° Pedido, Nombre..." 
+                        value="{{ request.args.get('busqueda', '') }}">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="small fw-bold text-muted">Filtrar Cliente</label>
+                <select name="filtro_cliente" id="selectFiltroCliente" class="form-select form-select-sm" style="width: 100%">
+                    <option value="">Todos los clientes</option>
+                    {% for c in clientes %}
+                        <option value="{{ c.documento }}" {% if cliente_seleccionado == c.documento %}selected{% endif %}>
+                            {{ c.nombre }} ({{ c.documento }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {% if session.get('role') in ['admin', 'administracion', 'almacen'] %}
+            <div class="col-md-2">
+                <label class="small fw-bold text-muted">Vendedor</label>
+                <select name="filtro_vendedor" class="form-select form-select-sm">
+                    <option value="todos">Todos</option>
+                    {% for v in vendedores %}
+                        <option value="{{ v.id }}" {% if request.args.get('filtro_vendedor') == v.id|string %}selected{% endif %}>
+                            {{ v.username }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="col-md-2"> <div class="d-flex gap-1">
+                    <div class="w-50">
+                        <label class="small fw-bold text-muted" style="font-size: 0.7rem;">Desde</label>
+                        <input type="date" name="fecha_inicio" class="form-control form-control-sm px-1" 
+                            value="{{ request.args.get('fecha_inicio', '') }}">
+                    </div>
+                    <div class="w-50">
+                        <label class="small fw-bold text-muted" style="font-size: 0.7rem;">Hasta</label>
+                        <input type="date" name="fecha_fin" class="form-control form-control-sm px-1" 
+                            value="{{ request.args.get('fecha_fin', '') }}">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-2 text-end">
+                <div class="d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm fw-bold w-100" title="Aplicar Filtros">
+                        <i class="bi bi-funnel-fill"></i>
+                    </button>
+                    <a href="{{ url_for('historial_ventas', vista=vista_actual) }}" class="btn btn-outline-secondary btn-sm w-50" title="Limpiar Filtros">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="card shadow-sm border-0">
     <div class="card-body p-0 table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
             <thead class="bg-light small text-uppercase text-muted">
                 <tr>
-                    <th class="ps-4">Documento</th>
-                    <th>Emisión</th>
+                    <th class="ps-4">Código</th>
+                    <th>F. Creación</th>
                     <th>Cliente</th>
                     <th>Vendedor</th>
-                    <th class="text-end">Monto Total</th>
+                    <th class="text-end">Total</th>
                     <th class="text-center">Estado</th>
-                    <th class="text-center">Gestión</th>
+                    <th class="text-center">Acción</th>
                 </tr>
             </thead>
             <tbody class="small">
                 {% for o in ordenes %}
-                <tr>
-                    <td class="ps-4">
-                        {% if o.estado == 'Aprobado' or o.estado == 'Despachado' or o.estado == 'Entregado' %}
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">NP-{{ "%05d"|format(o.id) }}</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border">COT-{{ "%05d"|format(o.id) }}</span>
-                        {% endif %}
-                    </td>
+                    <tr class="{% if o.estado == 'Observado' %}table-danger border-start border-5 border-danger{% endif %}">
+                        
+                        <td class="ps-4 fw-bold">
+                            {% if o.estado == 'Observado' %}
+                                <i class="bi bi-exclamation-triangle-fill text-danger me-1 blink-anim" title="Devuelto por Gerencia"></i>
+                            {% endif %}
+                            {{ "%05d"|format(o.id) }}
+                        </td>
 
-                    <td>{{ o.fecha.strftime('%d/%m %H:%M') }}</td>
-                    
-                    <td class="fw-bold text-truncate" style="max-width: 220px;">{{ o.cliente.nombre }}</td>
-                    
-                    <td><i class="bi bi-person text-muted"></i> {{ o.vendedor.username }}</td>
-                    
-                    <td class="text-end fw-bold">
-                        {{ "S/" if o.moneda == 'PEN' else "$" }} {{ "%.2f"|format(o.total) }}
-                    </td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span>{{ o.fecha.strftime('%d/%m/%Y') }}</span>
+                                <span class="text-muted" style="font-size:0.75rem">{{ o.fecha.strftime('%H:%M') }}</span>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            <div class="fw-bold text-truncate" style="max-width: 200px;">{{ o.cliente.nombre }}</div>
+                            {% if o.orden_compra %}
+                                <div class="text-primary" style="font-size:0.75rem"><i class="bi bi-receipt"></i> OC: {{ o.orden_compra }}</div>
+                            {% endif %}
+                        </td>
+                        
+                        <td>{{ o.vendedor.username }}</td>
+                        
+                        <td class="text-end fw-bold font-monospace">
+                            {{ "S/" if o.moneda == 'PEN' else "$" }} {{ "%.2f"|format(o.total) }}
+                        </td>
 
-                    <td class="text-center">
-                        {% if o.estado == 'Cotizacion' %}
-                            <span class="badge bg-secondary">Borrador</span>
-                        {% elif o.estado == 'Pendiente Aprobacion' %}
-                            <span class="badge bg-warning text-dark border border-dark animation-pulse">
-                                <i class="bi bi-exclamation-circle"></i> Esperando Gerencia
+                        <td class="text-center">
+                            <span class="badge 
+                                {% if o.estado == 'Cotizacion' %}bg-secondary
+                                {% elif o.estado == 'Pendiente Aprobacion' %}bg-warning text-dark border border-dark
+                                {% elif o.estado == 'Observado' %}bg-danger
+                                {% elif o.estado == 'Aprobado' %}bg-primary
+                                {% elif o.estado == 'Despachado' %}bg-info text-dark
+                                {% elif o.estado == 'Entregado' %}bg-success
+                                {% elif o.estado == 'Anulado' %}bg-dark
+                                {% else %}bg-secondary{% endif %}">
+                                
+                                {% if o.estado == 'Cotizacion' %}📝 Borrador
+                                {% elif o.estado == 'Pendiente Aprobacion' %}⏳ En Revisión
+                                {% elif o.estado == 'Observado' %}⚠️ CORREGIR
+                                {% elif o.estado == 'Aprobado' %}✅ Nota Pedido
+                                {% elif o.estado == 'Despachado' %}🚚 En Ruta
+                                {% elif o.estado == 'Entregado' %}📦 Entregado
+                                {% elif o.estado == 'Anulado' %}❌ Anulado
+                                {% else %}{{ o.estado }}{% endif %}
                             </span>
-                        {% elif o.estado == 'Aprobado' %}
-                            <span class="badge bg-primary">Nota Pedido</span>
-                        {% elif o.estado == 'Despachado' %}
-                            <span class="badge bg-info text-dark">En Ruta</span>
-                        {% endif %}
-                    </td>
+                        </td>
 
-                    <td class="text-center">
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-light border" onclick="verDetalle('{{o.id}}', '{{o.cliente.nombre}}', '{{o.tipo_entrega}}', '{{o.total}}')" title="Ver detalle">
-                                <i class="bi bi-eye"></i>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-light border shadow-sm" onclick="verDetalleCompleto('{{o.id}}')">
+                                <i class="bi bi-eye-fill text-primary"></i> Ver / Gestionar
                             </button>
-
-                            {% if o.estado == 'Cotizacion' %}
-                                {% if session.get('user_id') == o.vendedor_id or session.get('role') == 'admin' %}
-                                
-                                    <a href="{{ url_for('editar_venta', order_id=o.id) }}" class="btn btn-sm btn-outline-primary" title="Editar / Corregir">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </a>
-                                    
-                                    <button class="btn btn-sm btn-outline-success" onclick="solicitarAprobacion('{{o.id}}')" title="Enviar a Gerencia">
-                                        <i class="bi bi-send"></i>
-                                    </button>
-                                    
-                                    <button class="btn btn-sm btn-outline-danger" onclick="anularOrden('{{o.id}}')" title="Anular">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                {% endif %}
-                            {% endif %}
-
-                            {% if o.estado == 'Pendiente Aprobacion' and session.get('role') in ['admin', 'administracion'] %}
-                                <a href="{{ url_for('editar_venta', order_id=o.id) }}" class="btn btn-sm btn-warning" title="Corregir datos antes de aprobar">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </a>
-                                
-                                <button class="btn btn-sm btn-success fw-bold" onclick="aprobarGerencia('{{o.id}}')" title="APROBAR (Descuenta Stock)">
-                                    <i class="bi bi-check-lg"></i>
-                                </button>
-                                
-                                <button class="btn btn-sm btn-danger" onclick="rechazarCotizacion('{{o.id}}')" title="Observar/Rechazar">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            {% endif %}
-
-                            <a href="{{ url_for('descargar_cotizacion', order_id=o.id) }}" class="btn btn-sm btn-light border" title="PDF">
-                                <i class="bi bi-file-pdf text-danger"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
                 {% else %}
-                <tr><td colspan="7" class="text-center py-4 text-muted">No hay registros.</td></tr>
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <div class="fs-1 opacity-25"><i class="bi bi-folder2-open"></i></div>
+                            <p class="mt-2">No se encontraron registros en esta vista.</p>
+                        </td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <div class="card-footer bg-white border-top py-3">
+        <nav aria-label="Navegación">
+            <ul class="pagination justify-content-center mb-0 pagination-sm">
+                
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('historial_ventas', page=pagination.prev_num, vista=vista_actual, busqueda=request.args.get('busqueda',''), filtro_vendedor=request.args.get('filtro_vendedor',''), fecha_inicio=request.args.get('fecha_inicio',''), fecha_fin=request.args.get('fecha_fin','')) }}">
+                        Anterior
+                    </a>
+                </li>
+
+                <li class="page-item disabled">
+                    <span class="page-link text-muted">
+                        Pág. {{ pagination.page }} de {{ pagination.pages }}
+                    </span>
+                </li>
+
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('historial_ventas', page=pagination.next_num, vista=vista_actual, busqueda=request.args.get('busqueda',''), filtro_vendedor=request.args.get('filtro_vendedor',''), fecha_inicio=request.args.get('fecha_inicio',''), fecha_fin=request.args.get('fecha_fin','')) }}">
+                        Siguiente
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
 </div>
 
-<script>
-    // --- 1. SOLICITUD VENDEDOR ---
-    function solicitarAprobacion(id) {
-        Swal.fire({
-            title: '¿Cliente confirmó?',
-            text: "La cotización se bloqueará y pasará a revisión de gerencia.",
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, Enviar a Aprobación',
-            confirmButtonColor: '#198754'
-        }).then((r) => {
-            if(r.isConfirmed) cambiarEstado(id, 'Pendiente Aprobacion');
-        });
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+
+    /* Estilos para las pestañas y alertas */
+    .nav-pills .nav-link { color: #495057 !important; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: 600; transition: all 0.3s ease; }
+    .nav-pills .nav-link:hover { background-color: #e9ecef; color: #0d6efd !important; }
+    .nav-pills .nav-link.active { background-color: #0d6efd !important; color: #ffffff !important; border-color: #0d6efd; box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3); }
+    .nav-pills .nav-link .badge { color: #fff; }
+    .blink-anim { animation: blinker 2s linear infinite; }
+    .select2-container .select2-selection--single { height: 31px !important; padding-top: 2px; }
+    .select2-container--default .select2-selection--single { border: 1px solid #dee2e6; border-radius: 0.25rem; }
+    .select2-container { width: 100% !important; }
+    @keyframes blinker { 50% { opacity: 0.5; } }
+    /* 1. Estilo base para las Pestañas (INACTIVAS) */
+    .nav-pills .nav-link {
+        color: #495057 !important;      /* Color Gris Oscuro para texto */
+        background-color: #f8f9fa;      /* Fondo Gris muy claro */
+        border: 1px solid #dee2e6;      /* Borde suave para definir el botón */
+        font-weight: 600;               /* Letra un poco más gruesa */
+        transition: all 0.3s ease;      /* Transición suave */
     }
 
-    // --- 2. APROBACIÓN GERENCIAL (LA IMPORTANTE) ---
+    /* 2. Efecto al pasar el mouse (Hover) */
+    .nav-pills .nav-link:hover {
+        background-color: #e9ecef;      /* Fondo un poco más oscuro al pasar mouse */
+        color: #0d6efd !important;      /* Texto azul al pasar mouse */
+    }
+
+    /* 3. Estilo para la Pestaña ACTIVA (Seleccionada) */
+    .nav-pills .nav-link.active {
+        background-color: #0d6efd !important; /* Fondo AZUL */
+        color: #ffffff !important;            /* Texto BLANCO */
+        border-color: #0d6efd;                /* Borde Azul */
+        box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3); /* Sombra suave */
+    }
+
+    /* 4. Arreglo para los Badges (Contadores) dentro de las pestañas */
+    /* Cuando está inactiva, el badge es gris oscuro */
+    .nav-pills .nav-link .badge {
+        color: #fff;
+    }
+    
+    /* Animación de parpadeo para alertas */
+    .blink-anim { animation: blinker 2s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0.5; } }
+</style>
+
+<div class="modal fade" id="modalDetalleCompleto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            
+            <div class="modal-header bg-primary text-white py-3">
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="modalTitulo">
+                            <i class="bi bi-file-text"></i> Cargando...
+                        </h5>
+                        <div class="small opacity-75" id="modalSubtitulo">...</div>
+                    </div>
+                    <div id="badgeEstadoModal" class="px-3"></div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body bg-light">
+                
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-primary fw-bold small text-uppercase border-bottom pb-2">
+                                    <i class="bi bi-person-vcard"></i> Cliente
+                                </h6>
+                                <div class="fw-bold text-dark" id="view_cliente">...</div>
+                                <div class="small text-muted mb-1">RUC: <span id="view_ruc">...</span></div>
+                                <div class="small text-muted"><i class="bi bi-geo-alt"></i> <span id="view_dir">...</span></div>
+                                <div class="small text-muted"><i class="bi bi-telephone"></i> <span id="view_tel">...</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-warning fw-bold small text-uppercase border-bottom pb-2 text-dark">
+                                    <i class="bi bi-briefcase"></i> Condiciones
+                                </h6>
+                                <table class="table table-sm table-borderless small mb-0">
+                                    <tr><td class="text-muted">Atención:</td><td class="fw-bold" id="view_atte">...</td></tr>
+                                    <tr><td class="text-muted">O/C:</td><td class="fw-bold text-primary" id="view_oc">...</td></tr>
+                                    <tr><td class="text-muted">Pago:</td><td id="view_pago">...</td></tr>
+                                    <tr><td class="text-muted">Validez:</td><td id="view_validez">...</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-success fw-bold small text-uppercase border-bottom pb-2">
+                                    <i class="bi bi-truck"></i> Despacho
+                                </h6>
+                                <div class="small mb-1">
+                                    <strong>Tipo:</strong> <span class="badge bg-secondary" id="view_tipo_entrega">...</span>
+                                </div>
+                                <div class="small mb-1">
+                                    <strong>Fecha:</strong> <span class="fw-bold text-danger" id="view_fecha_entrega">...</span>
+                                </div>
+                                <div class="small text-muted border-top pt-2 mt-2">
+                                    <i class="bi bi-pin-map"></i> <span id="view_lugar_entrega">...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-list-check"></i> Items de la Cotización
+                    </div>
+                    <div class="card-body p-0 table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light small text-uppercase text-muted">
+                                <tr>
+                                    <th class="ps-3" style="width: 10%">SKU</th>
+                                    <th style="width: 45%">Descripción</th>
+                                    <th class="text-center" style="width: 10%">Cant.</th>
+                                    <th class="text-end" style="width: 15%">P. Unit</th>
+                                    <th class="text-end pe-3" style="width: 15%">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="view_tabla_items" class="small">
+                                </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <td colspan="3"></td>
+                                    <td class="text-end fw-bold">Subtotal:</td>
+                                    <td class="text-end pe-3 fw-bold" id="view_subtotal">0.00</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"></td>
+                                    <td class="text-end text-danger">Descuento:</td>
+                                    <td class="text-end pe-3 text-danger" id="view_descuento">- 0.00</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"></td>
+                                    <td class="text-end text-muted">IGV (18%):</td>
+                                    <td class="text-end pe-3" id="view_igv">0.00</td>
+                                </tr>
+                                <tr class="fs-5 text-primary fw-bold">
+                                    <td colspan="3" class="ps-3">
+                                        <small class="text-muted fs-6 fw-normal">Moneda: <span id="view_moneda"></span></small>
+                                    </td>
+                                    <td class="text-end">TOTAL:</td>
+                                    <td class="text-end pe-3" id="view_total">0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="box_motivo_rechazo" class="alert alert-danger border-danger mt-3 mb-2 d-none shadow-sm">
+                    <div class="d-flex">
+                        <div class="me-3 fs-1"><i class="bi bi-exclamation-octagon-fill"></i></div>
+                        <div>
+                            <h6 class="fw-bold text-uppercase mb-1">Corrección Requerida (Gerencia):</h6>
+                            <div class="fst-italic" id="view_motivo_rechazo">...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-secondary border-secondary mt-2 mb-0 d-flex align-items-center small">
+                    <i class="bi bi-pencil-fill me-2 opacity-50"></i>
+                    <div>
+                        <strong>Nota Adicional (Vendedor):</strong> <span id="view_obs" class="text-muted">...</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer bg-white d-flex justify-content-between">
+                
+                <a href="#" id="btn_ir_editar" class="btn btn-outline-secondary fw-bold">
+                    <i class="bi bi-pencil"></i> Editar Contenido
+                </a>
+
+                <div id="panel_acciones_gerencia" class="d-none">
+                    <button class="btn btn-outline-danger me-2" onclick="rechazarDesdeModal()">
+                        <i class="bi bi-x-circle"></i> Observar
+                    </button>
+                    <button class="btn btn-success fw-bold px-4 shadow" onclick="aprobarDesdeModal()">
+                        <i class="bi bi-check-circle-fill"></i> APROBAR PEDIDO
+                    </button>
+                </div>
+
+                <div id="panel_acciones_vendedor" class="d-none">
+                    <button class="btn btn-primary fw-bold px-4 shadow" onclick="solicitarAprobacionDesdeModal()">
+                        <i class="bi bi-send-fill"></i> Enviar a Gerencia
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+
+<script>
+    // --- VARIABLES GLOBALES ---
+    let ordenIdActual = null;
+
+    // --- FUNCIÓN PRINCIPAL: CARGAR Y MOSTRAR MODAL ---
+    function verDetalleCompleto(id) {
+        ordenIdActual = id;
+        
+        // A. Resetear UI (Mostrar "Cargando...")
+        $('#modalTitulo').text('Cargando información...');
+        $('#view_tabla_items').html('<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Consultando servidor...</p></td></tr>');
+        
+        // B. Abrir Modal
+        const modalEl = document.getElementById('modalDetalleCompleto');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+
+        // C. Pedir datos al Backend
+        fetch(`/api/obtener_detalle_venta/${id}`)
+            .then(r => r.json())
+            .then(res => {
+                if(res.status === 'success') {
+                    const d = res.data;
+                    const simbolo = d.moneda === 'PEN' ? 'S/' : '$';
+
+                    // --- 1. CABECERA Y ESTADO ---
+                    $('#modalTitulo').html(`Cotización <span class="text-primary">#${String(d.id).padStart(5, '0')}</span>`);
+                    $('#modalSubtitulo').text(`Vendedor: ${d.vendedor} | Fecha: ${d.fecha}`);
+                    
+                    // Badges de Estado (Colores según lógica de negocio)
+                    let badgeHtml = '<span class="badge bg-secondary">Borrador</span>';
+                    if(d.estado === 'Pendiente Aprobacion') badgeHtml = '<span class="badge bg-warning text-dark border border-dark">🟡 Pendiente Aprobación</span>';
+                    if(d.estado === 'Aprobado') badgeHtml = '<span class="badge bg-success">🟢 Aprobado / NP</span>';
+                    if(d.estado === 'Anulado') badgeHtml = '<span class="badge bg-danger">🔴 Anulado</span>';
+                    if(d.estado === 'Observado') badgeHtml = '<span class="badge bg-danger text-white border border-white"><i class="bi bi-exclamation-circle"></i> OBSERVADO / CORREGIR</span>';
+                    
+                    $('#badgeEstadoModal').html(badgeHtml);
+
+                    // --- 2. DATOS INFORMATIVOS ---
+                    $('#view_cliente').text(d.cliente_nombre);
+                    $('#view_ruc').text(d.cliente_doc);
+                    $('#view_dir').text(d.cliente_dir);
+                    $('#view_tel').text(d.cliente_tel);
+
+                    $('#view_atte').text(d.atencion);
+                    $('#view_oc').text(d.orden_compra);
+                    $('#view_pago').text(d.condicion_pago);
+                    $('#view_validez').text(d.validez);
+
+                    $('#view_tipo_entrega').text(d.tipo_entrega);
+                    $('#view_fecha_entrega').text(d.fecha_entrega);
+                    $('#view_lugar_entrega').text(d.direccion_entrega);
+
+                    // --- 3. OBSERVACIONES (Destacar si fue rechazado) ---
+                    $('#view_obs').text(d.observacion);
+
+                    // B. Nota del Gerente (Solo si está observado)
+                    if (d.estado === 'Observado' && d.motivo_rechazo) {
+                        $('#view_motivo_rechazo').text(d.motivo_rechazo);
+                        $('#box_motivo_rechazo').removeClass('d-none'); // MOSTRAR CAJA ROJA
+                    } else {
+                        $('#box_motivo_rechazo').addClass('d-none'); // OCULTAR CAJA ROJA
+                    }
+
+                    // --- 4. TABLA DE ITEMS (Con lógica de Kits) ---
+                    const tbody = $('#view_tabla_items');
+                    tbody.empty();
+
+                    d.items.forEach(item => {
+                        let row = `
+                            <tr>
+                                <td class="fw-bold text-muted ps-3 small">${item.sku}</td>
+                                <td>
+                                    <div class="fw-bold text-dark">${item.descripcion}</div>
+                        `;
+
+                        // Si es GLB (Kit), mostrar sus componentes y verificar Stock
+                        if(item.tipo === 'GLB' && item.componentes && item.componentes.length > 0) {
+                            row += `<div class="mt-2 p-2 bg-white border rounded shadow-sm small">
+                                        <div class="fw-bold text-primary text-uppercase mb-1" style="font-size:0.7rem">
+                                            <i class="bi bi-box-seam"></i> Composición del Kit:
+                                        </div>
+                                        <ul class="list-unstyled mb-0 ps-2 border-start border-3 border-primary">`;
+                            
+                            item.componentes.forEach(c => {
+                                let stockSuficiente = c.stock_actual >= c.cant_total;
+                                let colorStock = stockSuficiente ? 'text-success' : 'text-danger fw-bold';
+                                let iconStock = stockSuficiente ? 'check-circle' : 'exclamation-triangle-fill';
+                                
+                                row += `
+                                    <li class="mb-1">
+                                        • ${c.nombre} <span class="text-muted">x ${c.cant_req}</span>
+                                        <div class="d-inline-block ms-2 ${colorStock}" style="font-size:0.75rem">
+                                            <i class="bi bi-${iconStock}"></i> Stock: ${c.stock_actual} / Req: ${c.cant_total}
+                                        </div>
+                                    </li>
+                                `;
+                            });
+                            row += `</ul></div>`;
+                        }
+
+                        row += `</td>
+                                <td class="text-center fw-bold fs-6">${item.cantidad}</td>
+                                <td class="text-end text-muted">${item.precio.toFixed(2)}</td>
+                                <td class="text-end fw-bold pe-3">${item.subtotal.toFixed(2)}</td>
+                            </tr>
+                        `;
+                        tbody.append(row);
+                    });
+
+                    // --- 5. TOTALES ---
+                    $('#view_moneda').text(d.moneda);
+                    $('#view_subtotal').text(simbolo + " " + d.subtotal.toFixed(2));
+                    $('#view_descuento').text("- " + d.descuento_total.toFixed(2));
+                    $('#view_igv').text(d.igv.toFixed(2));
+                    $('#view_total').text(simbolo + " " + d.total.toFixed(2));
+
+                    // --- 6. CONFIGURAR BOTONES (Esta es la parte clave) ---
+                    configurarBotones(d.estado, "{{ session.get('role') }}", id);
+
+                } else {
+                    Swal.fire('Error', res.msg, 'error');
+                    bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide();
+                }
+            })
+            .catch(err => {
+                console.error("Error Fetch:", err);
+                $('#view_tabla_items').html('<tr><td colspan="5" class="text-center text-danger fw-bold py-3"><i class="bi bi-wifi-off"></i> Error de conexión con el servidor.</td></tr>');
+            });
+    }
+
+// ============================================================
+    // 2. FUNCIÓN AUXILIAR: VISIBILIDAD DE BOTONES
+    // ============================================================
+    function configurarBotones(estado, rol, id) {
+        const btnEditar = document.getElementById('btn_ir_editar');
+        const panelGerencia = document.getElementById('panel_acciones_gerencia');
+        const panelVendedor = document.getElementById('panel_acciones_vendedor');
+        
+        // Primero ocultamos todo
+        btnEditar.classList.add('d-none');
+        panelGerencia.classList.add('d-none');
+        panelVendedor.classList.add('d-none');
+
+        // A. BOTÓN EDITAR:
+        // Visible si es borrador o si el gerente lo rechazó (Observado)
+        if (['Cotizacion', 'Observado'].includes(estado)) {
+            btnEditar.classList.remove('d-none');
+            btnEditar.href = `/editar_venta/${id}`;
+        }
+
+        // B. PANEL VENDEDOR (Enviar a Gerencia):
+        // Visible si es borrador o si fue devuelto para corregir
+        if (['Cotizacion', 'Observado'].includes(estado)) {
+            panelVendedor.classList.remove('d-none');
+        }
+
+        // C. PANEL GERENCIA (Aprobar/Rechazar):
+        // Visible SOLO si está Pendiente y el usuario es Jefe
+        if (estado === 'Pendiente Aprobacion' && (rol === 'admin' || rol === 'administracion')) {
+            panelGerencia.classList.remove('d-none');
+        }
+    }
+
     function aprobarGerencia(id) {
         Swal.fire({
-            title: 'Generar Nota de Pedido',
+            title: '¿Aprobar Cotización?',
             html: `
-                <div class="alert alert-warning text-start small">
-                    <i class="bi bi-exclamation-triangle-fill"></i> <b>ATENCIÓN:</b><br>
-                    Al aprobar, el sistema <b>descontará el stock automáticamente</b> del inventario.<br>
-                    Esta acción confirma la venta.
+                <div class="text-start fs-6">
+                    <p>Al aprobar, se realizarán las siguientes acciones:</p>
+                    <ul class="text-muted small">
+                        <li>Se generará la <b>Nota de Pedido</b> oficial.</li>
+                        <li><b>Se descontará el Stock</b> del inventario inmediatamente.</li>
+                        <li>El pedido pasará a estado "Por Despachar".</li>
+                    </ul>
                 </div>
-                ¿Está seguro de proceder?
             `,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Sí, Generar NP y Descontar',
-            confirmButtonColor: '#0d6efd',
+            confirmButtonText: '✅ Confirmar y Descontar Stock',
+            confirmButtonColor: '#198754',
             cancelButtonText: 'Cancelar',
             showLoaderOnConfirm: true,
             preConfirm: () => {
@@ -180,38 +639,127 @@
         });
     }
 
+    function rechazarDesdeModal() {
+        if(!ordenIdActual) return;
+        bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide();
+        rechazarCotizacion(ordenIdActual);
+    }
+
     function rechazarCotizacion(id) {
-        // Lógica simple para devolver a borrador
         Swal.fire({
-            title: 'Observar Cotización',
-            input: 'text',
-            inputLabel: 'Motivo',
+            title: 'Observar / Devolver',
+            text: "Indique al vendedor qué debe corregir (Precio, Cantidad, Datos, etc):",
+            input: 'textarea',
+            inputPlaceholder: 'Ej: El precio es muy bajo, subir a...',
+            inputAttributes: {
+                'aria-label': 'Ingrese el motivo'
+            },
+            icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Devolver a Vendedor'
-        }).then((r) => {
-            if(r.isConfirmed) cambiarEstado(id, 'Cotizacion'); // Vuelve a borrador
+            confirmButtonText: 'Devolver a Vendedor',
+            confirmButtonColor: '#ffc107', // Color Amarillo/Naranja de advertencia
+            cancelButtonText: 'Cancelar',
+            inputValidator: (value) => {
+                if (!value) {
+                    return '¡Debe escribir un motivo para que el vendedor entienda!';
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Enviar al backend con el motivo
+                fetch('/gestion_ventas/observar', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ order_id: id, motivo: result.value })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        Swal.fire('Observado', 'La cotización ha sido devuelta al vendedor con sus observaciones.', 'success')
+                        .then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', data.msg, 'error');
+                    }
+                });
+            }
         });
     }
 
-    function cambiarEstado(id, estado) {
-        // Usar tu ruta antigua o crear una genérica simple para cambios sin movimiento de stock
-        fetch(`/cambiar_estado/${id}/${estado}`).then(() => location.reload());
+    function solicitarAprobacionDesdeModal() {
+        if(!ordenIdActual) return;
+        bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide();
+        solicitarAprobacion(ordenIdActual);
     }
-    
-    function verDetalle(id, total) {
-        // Implementar modal simple de vista
-        Swal.fire({ title: `Venta #${id}`, text: `Total: ${total}`, icon: 'info' });
-    }
-</script>
 
-<style>
-    .animation-pulse {
-        animation: pulse-warning 2s infinite;
+    function solicitarAprobacion(id) {
+        Swal.fire({
+            title: '¿Enviar a Gerencia?',
+            text: "Su cotización quedará bloqueada para revisión. Asegúrese de que los precios y datos sean correctos.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Enviar a Revisión',
+            confirmButtonColor: '#0d6efd',
+            cancelButtonText: 'Cancelar'
+        }).then((r) => {
+            if(r.isConfirmed) {
+                cambiarEstadoAPI(id, 'Pendiente Aprobacion', 'Enviado exitosamente. Espere respuesta.');
+            }
+        });
     }
-    @keyframes pulse-warning {
-        0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
-        70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+
+    function aprobarDesdeModal() {
+        if(ordenIdActual) {
+            bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide();
+            aprobarGerencia(ordenIdActual);
+        }
     }
-</style>
+
+    // 4. ANULAR (Baja lógica, no borrar)
+    function anularOrden(id) {
+        Swal.fire({
+            title: '¿Anular Documento?',
+            text: "Esta acción invalidará la cotización. No se borrará del sistema (quedará como historial), pero no podrá recuperarse.",
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Anular Definitivamente',
+            confirmButtonColor: '#dc3545',
+            cancelButtonText: 'No, mantener'
+        }).then((r) => {
+            if(r.isConfirmed) {
+                cambiarEstadoAPI(id, 'Anulado', 'La cotización ha sido anulada.');
+            }
+        });
+    }
+
+    // --- FUNCIÓN GENÉRICA PARA CAMBIAR ESTADOS SIMPLES ---
+    function cambiarEstadoAPI(id, nuevoEstado, mensajeExito) {
+        fetch(`/cambiar_estado/${id}/${nuevoEstado}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Permiso denegado o error del servidor");
+                }
+                return response.json(); // O response.text() si no cambiaste el return del py
+            })
+            .then(() => {
+                Swal.fire('Correcto', mensajeExito, 'success').then(() => location.reload());
+            })
+            .catch(err => {
+                Swal.fire('Error', 'No se pudo realizar la acción. Verifique sus permisos.', 'error');
+            });
+    }
+
+    $(document).ready(function() {
+            
+            // Convertir el select normal en un buscador potente
+            $('#selectFiltroCliente').select2({
+                placeholder: "Buscar cliente...",
+                allowClear: true,
+                width: '100%',
+                language: {
+                    noResults: function() { return "No encontrado"; }
+                }
+            });
+
+    });
+</script>
 {% endblock %}

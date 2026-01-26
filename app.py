@@ -1830,16 +1830,41 @@ def registrar_pago():
     flash(f'Pago de S/ {monto} registrado correctamente.')
     return redirect(url_for('cobranzas'))
 
+# --- REEMPLAZAR ESTA FUNCIÓN EN APP.PY ---
+
 @app.route('/cambiar_estado/<int:order_id>/<nuevo_estado>')
 def cambiar_estado(order_id, nuevo_estado):
-    if session.get('role') not in ['admin', 'almacen']: return "Acceso denegado", 403
+    # 1. Verificar sesión
+    if 'user_id' not in session: return "No logueado", 401
     
+    rol = session.get('role')
+    user_id = session.get('user_id')
     orden = Order.query.get_or_404(order_id)
-    orden.estado = nuevo_estado
-    db.session.commit()
-    flash(f'Pedido #{order_id} actualizado a {nuevo_estado}')
-    return redirect(url_for('despachos'))
 
+    # 2. REGLAS DE PERMISOS (LÓGICA DE NEGOCIO)
+    permiso_concedido = False
+
+    # CASO A: Admin o Almacén (Tienen poder casi total)
+    if rol in ['admin', 'almacen', 'administracion']:
+        permiso_concedido = True
+    
+    # CASO B: Vendedor (Solo puede enviar SU cotización a aprobación)
+    elif rol == 'vendedor':
+        # Solo puede cambiar si la orden es SUYA
+        if orden.vendedor_id == user_id:
+            # Y solo si está pasando de 'Cotizacion'/'Observado' A 'Pendiente Aprobacion'
+            # O si quiere anularla
+            if nuevo_estado in ['Pendiente Aprobacion', 'Anulado']:
+                permiso_concedido = True
+
+    # 3. EJECUCIÓN
+    if permiso_concedido:
+        orden.estado = nuevo_estado
+        db.session.commit()
+        # Si es fetch API, deberíamos retornar JSON, pero como tu JS espera texto/redirect:
+        return {'status': 'success', 'msg': f'Estado actualizado a {nuevo_estado}'}
+    else:
+        return {'status': 'error', 'msg': 'No tiene permisos para realizar esta acción.'}, 403
 @app.route('/reportes_predicciones')
 def reportes_predicciones():
     if session.get('role') not in ['admin', 'administracion']: return "Acceso denegado", 403
@@ -2079,67 +2104,133 @@ def aprobar_cotizacion_gerencia(order_id):
         db.session.rollback()
         return {'status': 'error', 'msg': f'Error crítico en transacción: {str(e)}'}
 
+# --- EN APP.PY ---
+# --- EN APP.PY (Función historial_ventas AJUSTADA) ---
+
 @app.route('/historial_ventas')
 def historial_ventas():
+    # 1. Seguridad
     if 'user_id' not in session: return redirect(url_for('login'))
     
+    rol = session['role']
+    user_id = session['user_id']
+
+    # Datos para filtros (Solo Admins ven lista de vendedores para filtrar histórico)
+    vendedores = []
+    if rol in ['admin', 'administracion', 'almacen']:
+        vendedores = User.query.filter_by(role='vendedor').all()
+    
+    # Clientes para el select
+    clientes = Client.query.order_by(Client.nombre).limit(2000).all()
+
+    # Query Base
     query = Order.query
     
-    # 1. LÓGICA DE PESTAÑAS (TABS)
-    vista = request.args.get('vista')
-    
-    if vista == 'por_aprobar':
-        # Si estamos en la pestaña "Por Aprobar", mostramos SOLO lo pendiente de gerencia
-        query = query.filter(Order.estado == 'Pendiente Aprobacion')
-    else:
-        # Si estamos en la pestaña "Todo el Historial"
-        # Filtro de Rol: Si es vendedor, solo ve lo suyo. Si es Admin, ve todo.
-        if session['role'] == 'vendedor':
-            query = query.filter_by(vendedor_id=session['user_id'])
+    # 2. CONTADORES
+    cuentas = {
+        'rev': Order.query.filter_by(estado='Pendiente Aprobacion').count(),
+        'obs': 0
+    }
+    # Vendedor ve sus rechazados. Admin ve el total de pendientes globales.
+    if rol == 'vendedor':
+        cuentas['obs'] = Order.query.filter(Order.vendedor_id == user_id, Order.estado == 'Observado').count()
 
-        # 2. FILTROS DE BÚSQUEDA (Solo aplican en la vista general)
+    # 3. FILTROS Y VISTAS
+    busqueda = request.args.get('busqueda')
+    vista = request.args.get('vista', 'borradores')
+
+    # Filtro Cliente (Select)
+    filtro_cliente_ruc = request.args.get('filtro_cliente')
+    cliente_obj_filtro = None
+    if filtro_cliente_ruc:
+        cliente_obj_filtro = Client.query.filter_by(documento=filtro_cliente_ruc).first()
+        if cliente_obj_filtro:
+            query = query.filter(Order.cliente_id == cliente_obj_filtro.id)
+
+    if busqueda:
+        # --- BUSCADOR GLOBAL (AUDITORÍA) ---
+        # Si el Gerente busca explícitamente "Juan" o "Cotizacion 50", SÍ debe salir aunque sea borrador.
+        query = Order.query 
+        if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
         
-        # Filtro por Rango de Fechas
-        fecha_inicio = request.args.get('fecha_inicio')
-        fecha_fin = request.args.get('fecha_fin')
+        # Truco para buscar ID numérico
+        term_id = busqueda
+        if busqueda.isdigit(): term_id = str(int(busqueda))
+
+        query = query.join(Client).join(User).filter(
+            or_(
+                Client.nombre.ilike(f"%{busqueda}%"),
+                Client.documento.ilike(f"%{busqueda}%"),
+                User.username.ilike(f"%{busqueda}%"),
+                User.nombre_completo.ilike(f"%{busqueda}%"),
+                func.cast(Order.id, db.String).like(f"%{term_id}%") 
+            )
+        )
+    else:
+        # --- LÓGICA DE BANDEJAS (EL CAMBIO ESTÁ AQUÍ) ---
         
-        if fecha_inicio and fecha_fin:
+        if vista == 'borradores':
+            query = query.filter(Order.estado.in_(['Cotizacion', 'Observado']))
+            
+            # CAMBIO CLAVE:
+            # Antes: if rol == 'vendedor': filter_by...
+            # Ahora: SIEMPRE filtramos por user_id en esta vista.
+            # Por qué: 
+            # 1. Vendedor: Ve sus borradores (Correcto).
+            # 2. Gerente: Ve SUS propios borradores (si vende). NO ve los de otros.
+            # Resultado: El gerente tendrá esta bandeja limpia de ruido ajeno.
+            query = query.filter_by(vendedor_id=user_id)
+
+        elif vista == 'revision':
+            # Esta es la bandeja de entrada del Gerente
+            query = query.filter(Order.estado == 'Pendiente Aprobacion')
+            # El vendedor solo ve las suyas para saber que están en cola
+            if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
+
+        elif vista == 'activos':
+            query = query.filter(Order.estado.in_(['Aprobado', 'Despachado']))
+            if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
+
+        elif vista == 'cerrados':
+            query = query.filter(Order.estado.in_(['Entregado', 'Anulado', 'Rechazado']))
+            if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
+
+    # 4. Filtros Adicionales (Fechas, etc.)
+    fecha_inicio = request.args.get('fecha_inicio')
+    fecha_fin = request.args.get('fecha_fin')
+    if fecha_inicio and fecha_fin:
+        try:
             start = datetime.strptime(fecha_inicio, '%Y-%m-%d')
             end = datetime.strptime(fecha_fin + " 23:59:59", '%Y-%m-%d %H:%M:%S')
             query = query.filter(Order.fecha.between(start, end))
+        except: pass
 
-        # Filtro por Estado (Dropdown)
-        estado = request.args.get('estado')
-        if estado and estado != 'todos':
-            query = query.filter(Order.estado == estado)
+    # Filtro Vendedor (Dropdown) - Solo funciona en vistas globales (Revision, Activos, Cerrados)
+    filtro_vendedor = request.args.get('filtro_vendedor')
+    if rol != 'vendedor' and filtro_vendedor and filtro_vendedor != 'todos':
+        # Si estás en 'borradores', este filtro no hará nada porque ya filtramos por user_id arriba
+        query = query.filter(Order.vendedor_id == filtro_vendedor)
 
-        # Buscador por Cliente o RUC
-        busqueda = request.args.get('busqueda')
-        if busqueda:
-            query = query.join(Client).filter(
-                or_(
-                    Client.nombre.ilike(f"%{busqueda}%"),
-                    Client.documento.ilike(f"%{busqueda}%")
-                )
-            )
-    
-    # 3. ORDENAMIENTO Y EJECUCIÓN
-    ordenes = query.order_by(Order.fecha.desc()).all()
-    
-    # 4. CONTADOR PARA NOTIFICACIONES (Burbuja roja en pestaña)
-    # Cuenta cuántas hay pendientes en TOTAL para avisar al gerente
-    pendientes_count = Order.query.filter_by(estado='Pendiente Aprobacion').count()
+    # 5. Ejecución
+    query = query.order_by(Order.fecha.desc())
+    page = request.args.get('page', 1, type=int)
+    per_page = 20 
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    ordenes = pagination.items 
     
     return render_template('historial_ventas.html', 
                            ordenes=ordenes, 
-                           pendientes_count=pendientes_count, 
+                           pagination=pagination,
+                           vista_actual=vista,
+                           cuentas=cuentas,
+                           vendedores=vendedores,
+                           clientes=clientes,
+                           cliente_filtro=cliente_obj_filtro,
                            hoy=datetime.now().date())
 
+
 # --- RUTA PARA CARGAR LA EDICIÓN (GET) ---
-# --- RUTA PARA CARGAR LA EDICIÓN (GET) ---
-# --- RUTA PARA GUARDAR LA EDICIÓN (POST) ---
-# --- RUTA PARA CARGAR LA EDICIÓN (GET) ---
-# Esta es la ruta que tu HTML no encuentra
+
 @app.route('/editar_venta/<int:order_id>')
 def editar_venta(order_id):
     if 'user_id' not in session: return redirect(url_for('login'))
@@ -2218,93 +2309,216 @@ def editar_venta(order_id):
                            tc=orden.tipo_cambio, 
                            updated_at=config_tc.updated_at.strftime('%d/%m') if config_tc else None)
 
+# --- AGREGAR O CORREGIR EN APP.PY ---
+
 @app.route('/actualizar_venta', methods=['POST'])
 def actualizar_venta():
-    if 'user_id' not in session: return {'status': 'error'}, 403
+    if 'user_id' not in session: return {'status': 'error', 'msg': 'No autorizado'}, 403
     
     try:
         data = request.get_json()
-        order_id = data.get('order_id') # ID oculto que enviaremos
+        order_id = data.get('order_id') # Recibimos el ID
         
+        if not order_id:
+            return {'status': 'error', 'msg': 'No se recibió el ID de la orden para editar.'}
+
+        # 1. BUSCAR LA ORDEN EXISTENTE
         orden = Order.query.get_or_404(order_id)
         
-        # 1. Actualizar Datos de Cabecera (Cliente, Fechas, Notas)
-        # Nota: El cliente ya existe, solo actualizamos referencia si cambió datos de contacto
-        # Si quisieras cambiar de cliente totalmente, tendrías que buscar el nuevo ID.
-        
+        # 2. VALIDAR ESTADO (Seguridad)
+        # Solo se puede editar si está en Borrador u Observado
+        if orden.estado not in ['Cotizacion', 'Observado']:
+             return {'status': 'error', 'msg': 'No se puede editar una orden en proceso o cerrada.'}
+
+        # 3. ACTUALIZAR DATOS CABECERA (Sobreescribir)
         orden.atencion = data.get('cliente_atte')
         orden.orden_compra = data.get('orden_compra')
         orden.condicion_pago = data.get('condicion_pago')
         orden.validez_oferta = data.get('validez_oferta')
-        orden.observacion = data.get('observacion') # Comentario Despachador
+        orden.observacion = data.get('observacion')
         
-        # Fechas
+        # Fechas y Dirección
         f_entrega = data.get('fecha_entrega')
         if f_entrega:
             orden.fecha_entrega = datetime.strptime(f_entrega, '%Y-%m-%d').date()
-            
         orden.tipo_entrega = data.get('tipo_entrega')
         orden.direccion_envio = data.get('direccion_entrega')
         
-        # Moneda y Totales (Recalculados en backend idealmente, simplificado aquí por brevedad)
+        # Totales
         orden.moneda = data.get('moneda')
         orden.tipo_cambio = float(data.get('tc'))
         orden.subtotal = float(data.get('subtotal'))
         orden.igv = float(data.get('igv'))
         orden.total = float(data.get('total'))
-        
         orden.descuento_tipo = data.get('descuento_tipo')
         orden.descuento_valor = float(data.get('descuento_valor', 0))
         orden.descuento_total = float(data.get('descuento_total', 0))
 
-        # 2. GESTIÓN DE ITEMS (Estrategia: Limpiar y Re-crear)
-        # Es lo más seguro para evitar inconsistencias si borraron o agregaron lineas
-        
-        # A. Borrar componentes de kits viejos (Cascada suele manejarlo, pero por seguridad)
-        for d in orden.details:
-            OrderKitComponent.query.filter_by(order_detail_id=d.id).delete()
-        
-        # B. Borrar detalles viejos
+        # --- IMPORTANTE: SI ESTABA OBSERVADO, LO DEVOLVEMOS A BORRADOR (O LO DEJAMOS EN OBSERVADO?) ---
+        # Lo lógico es que si el vendedor edita, ya corrigió.
+        # Opción A: Se queda en 'Cotizacion' (Borrador) para que él decida cuándo enviar de nuevo.
+        # Opción B: Se envía directo a aprobación.
+        # Recomendado: Volver a 'Cotizacion' (Borrador) para que él revise antes de enviar.
+        if orden.estado == 'Observado':
+             orden.estado = 'Cotizacion' 
+
+        # 4. ACTUALIZAR ITEMS (Estrategia: Borrar viejos y crear nuevos)
+        # Esto es lo más limpio para evitar errores de duplicados en items
         OrderDetail.query.filter_by(order_id=orden.id).delete()
         
-        # C. Crear nuevos detalles (Copiado de nueva_venta)
         for item in data['items']:
-            # ... (Aquí copias EXACTAMENTE el mismo código del bucle 'for item in data['items']' de nueva_venta) ...
-            # ... (Desde 'tipo_item = ...' hasta 'db.session.add(detalle)') ...
-            # ... (Incluyendo la lógica de GLB y Fabricación) ...
-            
-            # --- COPIA RESUMIDA PARA REFERENCIA ---
-            tipo_item = item.get('tipo', 'PRODUCTO') 
+            tipo_item = item.get('tipo', 'PRODUCTO')
             detalle = OrderDetail(
                 order_id=orden.id,
-                item_type=tipo_item, 
+                item_type=tipo_item,
                 cantidad=int(item['cantidad']),
                 precio_aplicado=float(item['precio']),
                 subtotal=float(item['subtotal']),
                 tipo_precio_usado='Manual'
             )
+            
             if tipo_item == 'PRODUCTO':
                 detalle.product_id = item['id']
-            elif tipo_item == 'FABRICACION' or tipo_item == 'GLB':
+            elif tipo_item in ['FABRICACION', 'GLB']:
                  detalle.nombre_personalizado = item.get('descripcion_glb', item['nombre'])
                  detalle.nombre_personalizado_titulo = item.get('titulo_glb', '')
-                 # ... logica de vincular servicio por SKU ...
             
             db.session.add(detalle)
-            db.session.flush()
+            db.session.flush() # Para obtener ID del detalle
 
+            # Componentes Kit
             if tipo_item == 'GLB' and 'componentes' in item:
                 for comp in item['componentes']:
-                    nc = OrderKitComponent(order_detail_id=detalle.id, product_id=comp['id'], cantidad_requerida=int(comp['qty']))
+                    nc = OrderKitComponent(
+                        order_detail_id=detalle.id, 
+                        product_id=comp['id'], 
+                        cantidad_requerida=int(comp['qty'])
+                    )
                     db.session.add(nc)
-            # --------------------------------------
 
         db.session.commit()
-        return {'status': 'success', 'order_id': orden.id}
+        return {'status': 'success', 'order_id': orden.id, 'msg': 'Cotización actualizada correctamente.'}
 
     except Exception as e:
         db.session.rollback()
         return {'status': 'error', 'msg': str(e)}, 500
+
+@app.route('/api/obtener_detalle_venta/<int:order_id>')
+def obtener_detalle_venta(order_id):
+    # 1. Seguridad básica
+    if 'user_id' not in session: 
+        return {'status': 'error', 'msg': 'Sesión caducada, inicie sesión.'}, 401
+    
+    try:
+        orden = Order.query.get_or_404(order_id)
+        
+        # 2. Procesar Items (Productos y Kits)
+        items_data = []
+        for d in orden.details:
+            sku_mostrado = "GEN"
+            nombre_mostrado = d.nombre_personalizado or "Item sin nombre"
+
+            # Si está vinculado a un producto real
+            if d.product:
+                sku_mostrado = d.product.sku
+                nombre_mostrado = d.product.nombre
+            # Si es Fabricación o Kit (GLB)
+            elif d.item_type in ['FABRICACION', 'GLB']:
+                titulo = d.nombre_personalizado_titulo or ""
+                cuerpo = d.nombre_personalizado or ""
+                nombre_mostrado = f"{titulo} {cuerpo}".strip()
+                if d.item_type == 'FABRICACION': sku_mostrado = "SRV"
+                if d.item_type == 'GLB': sku_mostrado = "KIT"
+
+            # Lógica de Componentes (Si es un Kit)
+            comps_data = []
+            if d.item_type == 'GLB':
+                for c in d.kit_components:
+                    # Cálculo de stock visual
+                    total_necesario = c.cantidad_requerida * d.cantidad
+                    comps_data.append({
+                        'sku': c.product.sku,
+                        'nombre': c.product.nombre,
+                        'cant_req': c.cantidad_requerida,
+                        'cant_total': total_necesario,
+                        'stock_actual': c.product.stock_actual
+                    })
+
+            items_data.append({
+                'sku': sku_mostrado,
+                'descripcion': nombre_mostrado,
+                'cantidad': d.cantidad,
+                'precio': d.precio_aplicado,
+                'subtotal': d.subtotal,
+                'tipo': d.item_type,
+                'componentes': comps_data # Enviamos la lista al HTML
+            })
+
+        # 3. Datos Generales (Manejo de nulos con "or '-'")
+        data = {
+            'id': orden.id,
+            'fecha': orden.fecha.strftime('%d/%m/%Y %H:%M'),
+            'estado': orden.estado,
+            'vendedor': orden.vendedor.nombre_completo if orden.vendedor else 'Desconocido',
+            
+            # Cliente
+            'cliente_nombre': orden.cliente.nombre if orden.cliente else 'Cliente Eliminado',
+            'cliente_doc': orden.cliente.documento if orden.cliente else '-',
+            'cliente_dir': orden.cliente.direccion or '-',
+            'cliente_tel': orden.cliente.telefono or '-',
+            
+            # Info
+            'atencion': orden.atencion or '-',
+            'orden_compra': orden.orden_compra or '-',
+            'condicion_pago': orden.condicion_pago or '-',
+            'validez': orden.validez_oferta or '-',
+            'observacion': orden.observacion or 'Ninguna', # Nota del Vendedor
+            'motivo_rechazo': orden.motivo_rechazo or '',  # Nota del Gerente (NUEVO)
+            
+            # Logística
+            'tipo_entrega': orden.tipo_entrega or '-',
+            'fecha_entrega': orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else 'A coordinar',
+            'direccion_entrega': orden.direccion_envio or '-',
+            
+            # Financiero
+            'moneda': orden.moneda,
+            'subtotal': orden.subtotal,
+            'igv': orden.igv,
+            'total': orden.total,
+            'descuento_total': orden.descuento_total,
+            
+            'items': items_data
+        }
+        
+        return {'status': 'success', 'data': data}
+
+    except Exception as e:
+        print(f"ERROR API DETALLE: {str(e)}") # Esto saldrá en tu consola negra
+        return {'status': 'error', 'msg': f"Error interno: {str(e)}"}, 500
+    
+# --- EN APP.PY ---
+
+@app.route('/gestion_ventas/observar', methods=['POST'])
+def observar_cotizacion():
+    if session.get('role') not in ['admin', 'administracion']: 
+        return {'status': 'error', 'msg': 'No tiene permisos'}, 403
+
+    data = request.get_json()
+    order_id = data.get('order_id')
+    motivo = data.get('motivo')
+
+    if not motivo:
+        return {'status': 'error', 'msg': 'El motivo es obligatorio.'}
+
+    orden = Order.query.get_or_404(order_id)
+    
+    orden.estado = 'Observado'
+    orden.motivo_rechazo = motivo # <--- GUARDAMOS EN LA COLUMNA NUEVA
+    # NO tocamos orden.observacion (ahí se queda lo que escribió el vendedor)
+    
+    db.session.commit()
+    
+    return {'status': 'success', 'msg': 'Cotización observada y devuelta.'}
 
 # --- ARRANQUE DE LA APLICACIÓN ---
 if __name__ == '__main__':
