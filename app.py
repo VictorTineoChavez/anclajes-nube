@@ -8,7 +8,7 @@ from flask import send_from_directory
 import pandas as pd
 import html
 from sqlalchemy.exc import IntegrityError # Para capturar el error del SKU
-from sqlalchemy import or_
+from sqlalchemy import or_, func, text, extract
 from sqlalchemy import func
 from datetime import datetime, timedelta, date
 from flask import send_file
@@ -76,7 +76,7 @@ def index():
     if rol in ['admin', 'administracion']:
         # A. KPIs Financieros
         ventas_hoy = db.session.query(func.sum(Order.total)).filter(func.date(Order.fecha) == hoy).scalar() or 0
-        ventas_mes = db.session.query(func.sum(Order.total)).filter(func.strftime('%Y-%m', Order.fecha) == hoy.strftime('%Y-%m')).scalar() or 0
+        ventas_mes = db.session.query(func.sum(Order.total)).filter(extract('year', Order.fecha) == hoy.year, extract('month', Order.fecha) == hoy.month).scalar() or 0
         pedidos_pendientes = Order.query.filter(Order.estado == 'Pendiente').count()
         
         # B. Ranking de Vendedores (CORREGIDO AQUÍ)
@@ -117,7 +117,7 @@ def index():
     # ======================================================
     elif rol == 'vendedor':
         mis_ventas_hoy = db.session.query(func.sum(Order.total)).filter(Order.vendedor_id == user_id, func.date(Order.fecha) == hoy).scalar() or 0
-        mis_ventas_mes = db.session.query(func.sum(Order.total)).filter(Order.vendedor_id == user_id, func.strftime('%Y-%m', Order.fecha) == hoy.strftime('%Y-%m')).scalar() or 0
+        mis_ventas_mes = db.session.query(func.sum(Order.total)).filter(Order.vendedor_id == user_id, extract('year', Order.fecha) == hoy.year, extract('month', Order.fecha) == hoy.month).scalar() or 0
         mis_pendientes = Order.query.filter_by(vendedor_id=user_id, estado='Pendiente').count()
         
         mis_ultimas = Order.query.filter_by(vendedor_id=user_id).order_by(Order.fecha.desc()).limit(5).all()
