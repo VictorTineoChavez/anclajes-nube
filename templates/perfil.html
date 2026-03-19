@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Mi Perfil{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            
+            <div class="d-flex align-items-center mb-4">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3 shadow" 
+                     style="width: 64px; height: 64px; font-size: 1.8rem;">
+                    {{ u.username[0]|upper }}
+                </div>
+                <div>
+                    <h4 class="mb-0 fw-bold">Hola, {{ u.nombre_completo.split(' ')[0] }}</h4>
+                    <p class="text-muted mb-0">Gestione su información personal y seguridad.</p>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('perfil_usuario') }}" autocomplete="off">
+                
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-header bg-white border-0 pt-4 px-4">
+                        <h6 class="fw-bold text-primary text-uppercase small ls-1">
+                            <i class="bi bi-person-vcard me-2"></i> Información de Cuenta
+                        </h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted fw-bold">Usuario (Login)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-person-lock"></i></span>
+                                    <input type="text" class="form-control bg-light text-muted" value="{{ u.username }}" readonly disabled>
+                                </div>
+                                <div class="form-text x-small"><i class="bi bi-lock-fill"></i> No editable</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted fw-bold">Rol / Permisos</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-shield-lock"></i></span>
+                                    <input type="text" class="form-control bg-light text-muted text-uppercase" value="{{ u.role }}" readonly disabled>
+                                </div>
+                            </div>
+
+                            <hr class="my-3 text-muted opacity-25">
+
+                            <div class="col-12">
+                                <label class="form-label small text-muted fw-bold">Nombre Completo</label>
+                                <input type="text" name="nombre_completo" class="form-control" value="{{ u.nombre_completo }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted fw-bold">Celular</label>
+                                <input type="tel" name="celular" class="form-control" value="{{ u.celular or '' }}" 
+                                       placeholder="999..." pattern="9[0-9]{8}" maxlength="9" 
+                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted fw-bold">Email Corporativo</label>
+                                <input type="email" name="email_empresa" class="form-control" value="{{ u.email_empresa or '' }}" placeholder="nombre@empresa.com">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-header bg-white border-0 pt-4 px-4">
+                        <h6 class="fw-bold text-danger text-uppercase small ls-1">
+                            <i class="bi bi-key me-2"></i> Seguridad y Contraseña
+                        </h6>
+                    </div>
+                    <div class="card-body p-4 bg-light bg-opacity-25">
+                        <div class="alert alert-light border border-warning d-flex align-items-center mb-3" role="alert">
+                            <i class="bi bi-info-circle-fill text-warning me-2"></i>
+                            <div class="small text-muted">
+                                Deje estos campos <strong>vacíos</strong> si no desea cambiar su contraseña.
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Contraseña Actual</label>
+                                <input type="password" name="current_password" class="form-control" placeholder="Requerido para cambiar">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Nueva Contraseña</label>
+                                <input type="password" name="new_password" class="form-control" placeholder="Nueva clave">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Confirmar Nueva</label>
+                                <input type="password" name="confirm_password" class="form-control" placeholder="Repetir clave">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mb-5">
+                    <a href="{{ url_for('index') }}" class="btn btn-light border px-4">Cancelar</a>
+                    <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm">
+                        <i class="bi bi-check-circle-fill me-2"></i> Guardar Cambios
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

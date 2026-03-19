@@ -38,16 +38,7 @@ with app.app_context():
     
     db.session.add_all([admin, jefe_ventas, vendedor, almacen])
     
-    # 3. CREAR CATEGORÍAS INICIALES
-    cats = [
-        Category(nombre='Pernos', prefijo='PER', contador=0),
-        Category(nombre='Tuercas', prefijo='TUE', contador=0),
-        Category(nombre='Arandelas', prefijo='ARA', contador=0),
-        Category(nombre='Abrazaderas', prefijo='ABR', contador=0),
-        Category(nombre='Remaches', prefijo='REM', contador=0),
-        Category(nombre='Clavos', prefijo='CLA', contador=0)
-    ]
-    db.session.add_all(cats)
+    # 3. CREAR CATEGORÍAS INICIALE
     
     db.session.commit()
     print(">>> Usuarios y Categorías creadas exitosamente.")

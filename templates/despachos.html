@@ -2,92 +2,381 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>🚛 Centro de Despachos</h2>
+    <div>
+        <h2 class="fw-bold text-dark"><i class="bi bi-truck"></i> Centro de Despachos</h2>
+        <p class="text-muted small mb-0">Gestión logística y preparación de pedidos</p>
+    </div>
     
-    <div class="btn-group">
-        <a href="{{ url_for('despachos', ordenar_por='urgencia') }}" 
-           class="btn btn-outline-danger {% if orden_actual == 'urgencia' %}active{% endif %}">
-           <i class="bi bi-calendar-event"></i> Priorizar por Urgencia
+    <div class="btn-group shadow-sm">
+        <a href="{{ url_for('despachos', vista=vista_actual, ordenar_por='urgencia') }}" 
+           class="btn btn-outline-danger btn-sm {% if orden_actual == 'urgencia' %}active{% endif %}">
+           <i class="bi bi-alarm"></i> Urgencia
         </a>
-        <a href="{{ url_for('despachos', ordenar_por='ganancia') }}" 
-           class="btn btn-outline-success {% if orden_actual == 'ganancia' %}active{% endif %}">
-           <i class="bi bi-cash-stack"></i> Priorizar por Ganancia
+        <a href="{{ url_for('despachos', vista=vista_actual, ordenar_por='fecha') }}" 
+           class="btn btn-outline-secondary btn-sm {% if orden_actual == 'fecha' %}active{% endif %}">
+           <i class="bi bi-calendar"></i> Fecha
         </a>
     </div>
 </div>
 
+<ul class="nav nav-pills mb-4 p-2 bg-white rounded shadow-sm">
+    <li class="nav-item">
+        <a class="nav-link {% if vista_actual == 'pendientes' %}active bg-warning text-dark fw-bold{% else %}text-muted{% endif %}" 
+           href="{{ url_for('despachos', vista='pendientes') }}">
+            <i class="bi bi-inbox-fill"></i> Por Atender
+            {% if c_pend > 0 %}<span class="badge bg-danger ms-1">{{ c_pend }}</span>{% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if vista_actual == 'proceso' %}active bg-primary fw-bold{% else %}text-muted{% endif %}" 
+           href="{{ url_for('despachos', vista='proceso') }}">
+            <i class="bi bi-box-seam-fill"></i> En Preparación
+            {% if c_proc > 0 %}<span class="badge bg-white text-primary ms-1">{{ c_proc }}</span>{% endif %}
+        </a>
+    </li>
+    <li class="nav-item ms-auto">
+        <a class="nav-link {% if vista_actual == 'finalizados' %}active bg-success text-white fw-bold{% else %}text-muted{% endif %}" 
+           href="{{ url_for('despachos', vista='finalizados') }}">
+            <i class="bi bi-clock-history"></i> Historial Salidas
+        </a>
+    </li>
+</ul>
+
 <div class="row">
     {% for o in ordenes %}
-    <div class="col-md-6 mb-3">
-        {% set es_urgente = o.fecha_entrega <= hoy %}
-        
-        <div class="card border-start border-4 shadow-sm {% if es_urgente %}border-danger bg-light{% else %}border-info{% endif %}">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <h5 class="card-title fw-bold">
-                        {% if es_urgente %}<span class="badge bg-danger">URGENTE</span>{% endif %}
-                        Pedido #{{ o.id }}
-                    </h5>
+    {% set es_urgente = o.fecha_entrega and o.fecha_entrega <= hoy %}
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100 shadow-sm border-0 border-start border-5 
+            {% if o.estado == 'Aprobado' %}border-warning
+            {% elif o.estado == 'En Preparacion' %}border-primary
+            {% elif o.estado == 'Despachado' %}border-info
+            {% elif o.estado == 'Entregado' %}border-success{% endif %}">
+            
+            <div class="card-header bg-white pt-3 pb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5 class="fw-bold mb-1">
+                            OP-{{ "%05d"|format(o.id) }}
+                            {% if es_urgente and o.estado not in ['Despachado', 'Entregado'] %}
+                                <span class="badge bg-danger ms-1 blink-anim">URGENTE</span>
+                            {% endif %}
+                        </h5>
+                        <div class="small text-dark">
+                            <i class="bi bi-building"></i> <strong>{{ o.cliente.nombre }}</strong>
+                        </div>
+                    </div>
                     <div class="text-end">
-                        <small class="text-muted d-block">Entrega Estimada:</small>
-                        <strong class="{% if es_urgente %}text-danger{% else %}text-primary{% endif %}">
-                            {{ o.fecha_entrega.strftime('%d/%m/%Y') }}
-                        </strong>
+                        {% if o.estado == 'Despachado' %}
+                            <span class="badge bg-info text-dark border border-info"><i class="bi bi-truck"></i> EN RUTA</span>
+                        {% elif o.estado == 'Entregado' %}
+                            <span class="badge bg-success border border-success"><i class="bi bi-check-all"></i> FINALIZADO</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark border"><i class="bi bi-person"></i> {{ o.vendedor.username }}</span>
+                        {% endif %}
+                        
+                        <div class="small text-muted mt-1">
+                            Entrega: <strong>{{ o.fecha_entrega.strftime('%d/%m') if o.fecha_entrega else 'A coordinar' }}</strong>
+                        </div>
+                        
+                        {% if o.archivo_oc %}
+                            <div class="mt-1">
+                                <a href="{{ url_for('ver_oc', filename=o.archivo_oc) }}" target="_blank" class="badge bg-light text-secondary border text-decoration-none" title="Ver Orden Compra Cliente">
+                                    <i class="bi bi-paperclip"></i> Ver O/C
+                                </a>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
-                
-                <hr class="my-2">
-                
-                <div class="d-flex justify-content-between small mb-2">
-                    <span><strong>Cliente:</strong> {{ o.cliente.nombre }}</span>
-                    <span><strong>Tipo:</strong> {{ o.tipo_entrega }}</span>
-                </div>
+            </div>
 
-                <div class="mb-2 pb-2 border-bottom">
-                    <small class="text-muted d-block">Vendedor Responsable:</small>
-                    <span class="badge bg-white text-dark border">
-                        <i class="bi bi-person-badge"></i> {{ o.vendedor.nombre_completo }}
-                    </span>
-                </div>
+            <div class="card-body">
                 
-                {% if o.tipo_entrega == 'Envio' %}
-                <div class="alert alert-secondary py-1 px-2 small mb-2">
-                    <i class="bi bi-geo-alt-fill"></i> {{ o.direccion_envio }}
-                </div>
-                {% endif %}
-                
-                <ul class="list-group list-group-flush mb-3 small">
-                    {% for d in o.details %}
-                    <li class="list-group-item d-flex justify-content-between px-0 bg-transparent">
-                        {{ d.product.nombre }}
-                        <span class="badge bg-secondary rounded-pill">{{ d.cantidad }} un.</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="fw-bold text-success fs-5">S/ {{ "%.2f"|format(o.total) }}</span>
-                    
-                    {% if o.estado == 'Pendiente' %}
-                        <a href="{{ url_for('cambiar_estado', order_id=o.id, nuevo_estado='Despachado') }}" 
-                           class="btn btn-primary btn-sm">
-                           <i class="bi bi-box-seam"></i> Marcar Despachado
-                        </a>
-                    {% elif o.estado == 'Despachado' %}
-                        <a href="{{ url_for('cambiar_estado', order_id=o.id, nuevo_estado='Entregado') }}" 
-                           class="btn btn-success btn-sm">
-                           <i class="bi bi-check-lg"></i> Confirmar Entrega
-                        </a>
+                {% if vista_actual == 'pendientes' %}
+                    {% if o.observacion %}
+                        <div class="alert alert-warning p-2 mb-2 small border-warning text-dark">
+                            <i class="bi bi-megaphone-fill me-1"></i> <strong>Nota:</strong> {{ o.observacion }}
+                        </div>
                     {% endif %}
+
+                    <h6 class="small fw-bold text-muted border-bottom pb-1 mb-2">Resumen de Carga:</h6>
+                    <ul class="list-group list-group-flush small mb-0">
+                        {% for d in o.details[:3] %}
+                        <li class="list-group-item px-0 py-1 d-flex justify-content-between border-0 align-items-start">
+                            <span class="text-wrap lh-sm" style="max-width: 80%;"> <i class="bi bi-box-seam text-primary me-1"></i> {{ d.product.nombre }}
+                            </span>
+                            <span class="badge bg-secondary rounded-pill mt-1">{{ d.cantidad }}</span>
+                        </li>
+                        {% endfor %}    
+                        {% if o.details|length > 3 %}
+                        <li class="list-group-item px-0 py-1 text-center text-muted fst-italic border-0">
+                            ... y {{ o.details|length - 3 }} items más ...
+                        </li>
+                        {% endif %}
+                    </ul>
+
+                {% elif vista_actual == 'proceso' %}
+                    
+                    {% if o.observacion %}
+                    <div class="alert alert-warning p-2 mb-2 small border-warning text-dark">
+                        <i class="bi bi-megaphone-fill me-1"></i> <strong>Nota Logística:</strong> {{ o.observacion }}
+                    </div>
+                    {% endif %}
+
+                    <div class="table-responsive mb-3 border rounded bg-white" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-hover small mb-0 align-middle">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width: 15%">Ubic.</th>
+                                    <th>Producto</th>
+                                    <th class="text-center">Cant.</th>
+                                    <th class="text-center">Check</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in o.details %}
+                                <tr id="row_{{d.id}}" class="{{ 'table-success' if d.check_almacen else '' }}">
+                                    <td class="fw-bold text-primary">{{ d.product.ubicacion or '--' }}</td>
+                                    <td>
+                                        {{ d.product.nombre }}
+                                        {% if d.item_type == 'GLB' %}<span class="badge bg-info text-dark" style="font-size:0.6em">KIT</span>{% endif %}
+                                    </td>
+                                    <td class="text-center fw-bold">{{ d.cantidad }}</td>
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input border-2 border-primary" 
+                                               style="cursor: pointer;"
+                                               onclick="guardarCheck('{{d.id}}', this)"
+                                               {% if d.check_almacen %}checked{% endif %}>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <form action="{{ url_for('cambiar_estado', order_id=o.id, nuevo_estado='Despachado') }}" method="GET" id="form_despacho_{{o.id}}">
+                        <input type="hidden" name="origin" value="despachos">
+                        
+                        <div class="bg-light p-3 rounded border mb-3">
+                            <h6 class="small fw-bold text-primary mb-2 border-bottom pb-1">
+                                <i class="bi bi-box-seam"></i> Datos de Salida (Guía)
+                            </h6>
+                            
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white">Kg</span>
+                                        <input type="number" step="0.01" class="form-control" placeholder="Peso" name="peso_kardex" required>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white">Und</span>
+                                        <input type="number" class="form-control" placeholder="Bultos" name="bultos" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <select name="chofer_id" class="form-select form-select-sm border-primary" required>
+                                    <option value="" selected disabled>-- Asignar Chofer --</option>
+                                    {% for c in choferes %}
+                                        <option value="{{ c.id }}">{{ c.nombre_completo }}</option>
+                                    {% endfor %}
+                                    <option value="">Transporte Externo</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+
+                {% elif vista_actual == 'finalizados' %}
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-light p-2 rounded me-3 text-center border" style="min-width: 80px;">
+                            <div class="h4 mb-0 fw-bold">{{ o.details|length }}</div>
+                            <small class="text-muted" style="font-size: 0.65rem;">ITEMS</small>
+                        </div>
+                        <div>
+                            <div class="small text-muted"><i class="bi bi-geo-alt-fill text-danger"></i> Destino:</div>
+                            <div class="fw-bold text-dark lh-sm" style="font-size: 0.9rem;">
+                                {{ o.direccion_envio or 'Recojo en Tienda' }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-light p-2 rounded border small mb-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span><i class="bi bi-box"></i> Bultos: <strong>{{ o.cantidad_bultos or '--' }}</strong></span>
+                            <span><i class="bi bi-speedometer2"></i> Peso: <strong>{{ o.peso_total or '--' }} Kg</strong></span>
+                        </div>
+                        <div class="border-top pt-1 mt-1 text-primary">
+                            <i class="bi bi-person-badge-fill"></i> Chofer: 
+                            <strong>{{ o.chofer.nombre_completo if o.chofer else 'Externo/No asignado' }}</strong>
+                        </div>
+                    </div>
+                    
+                    {% if o.estado == 'Entregado' %}
+                        <div class="mt-2 text-center small text-success fw-bold bg-success bg-opacity-10 p-1 rounded">
+                            <i class="bi bi-check-circle-fill"></i> Entrega Confirmada
+                        </div>
+                    {% endif %}
+
+                {% endif %}
+
+            </div>
+
+            <div class="card-footer bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    
+                    <div class="btn-group">
+                        <a href="{{ url_for('descargar_cotizacion', order_id=o.id, modo='almacen') }}" class="btn btn-outline-dark btn-sm fw-bold border-0" title="Hoja Picking">
+                            <i class="bi bi-printer-fill"></i> Picking
+                        </a>
+                        
+                        {% if o.estado in ['Despachado', 'Entregado'] %}
+                        <button class="btn btn-outline-secondary btn-sm border-0" disabled title="Próximamente">
+                            <i class="bi bi-file-earmark-ruled"></i> Guía
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        {% if o.estado == 'Aprobado' %}
+                            <a href="{{ url_for('iniciar_picking', order_id=o.id) }}" class="btn btn-primary btn-sm fw-bold px-3 shadow-sm">
+                                <i class="bi bi-hand-index-thumb"></i> ATENDER
+                            </a>
+                        
+                        {% elif o.estado == 'En Preparacion' %}
+                            <form action="{{ url_for('cambiar_estado', order_id=o.id, nuevo_estado='Despachado') }}" method="GET" id="form_despacho_{{o.id}}">
+                                <input type="hidden" name="origin" value="despachos">
+                                
+                                <div class="bg-light p-3 rounded border mb-3 position-relative">
+                                    
+                                    <div class="position-absolute top-0 end-0 p-2">
+                                        <button type="button" class="btn btn-link btn-sm text-decoration-none p-0" 
+                                                onclick="cambiarTipoEntrega('{{o.id}}', '{{o.tipo_entrega}}')"
+                                                title="Cambiar tipo de entrega (Imprevisto)">
+                                            <i class="bi bi-arrow-repeat"></i> Cambiar
+                                        </button>
+                                    </div>
+
+                                    <h6 class="small fw-bold text-primary mb-2 border-bottom pb-1">
+                                        <i class="bi bi-box-seam"></i> Datos de Salida
+                                    </h6>
+                                    
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-white">Kg</span>
+                                                <input type="number" step="0.01" class="form-control" placeholder="Peso" name="peso_kardex" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-white">Und</span>
+                                                <input type="number" class="form-control" placeholder="Bultos" name="bultos" required>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {% if o.tipo_entrega == 'Envio' %}
+                                        <div>
+                                            <label class="small text-muted mb-1">Asignar Unidad de Transporte:</label>
+                                            <select name="chofer_id" class="form-select form-select-sm border-primary" required>
+                                                <option value="" selected disabled>-- Seleccionar Chofer --</option>
+                                                {% for c in choferes %}
+                                                    <option value="{{ c.id }}">{{ c.nombre_completo }}</option>
+                                                {% endfor %}
+                                                <option value="externo">Transporte Externo (Shalom/Olva)</option>
+                                            </select>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning py-1 px-2 mb-0 d-flex align-items-center small border-warning">
+                                            <i class="bi bi-shop me-2 fs-5"></i>
+                                            <div class="lh-1">
+                                                <strong>Cliente Recoge</strong><br>
+                                                <span style="font-size: 0.75rem">No requiere asignar chofer.</span>
+                                            </div>
+                                            <input type="hidden" name="chofer_id" value=""> 
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </form>
+                        
+                        {% elif o.estado == 'Despachado' %}
+                            <a href="{{ url_for('cambiar_estado', order_id=o.id, nuevo_estado='Entregado', origin='despachos') }}" class="btn btn-success btn-sm fw-bold px-3 shadow-sm">
+                                <i class="bi bi-check-lg"></i> CONFIRMAR ENTREGA
+                            </a>
+                        
+                        {% elif o.estado == 'Entregado' %}
+                            <span class="badge bg-light text-muted border">Archivado</span>
+                        {% endif %}
+                    </div>
+                    
                 </div>
             </div>
         </div>
     </div>
     {% else %}
     <div class="col-12 text-center text-muted py-5">
-        <h4><i class="bi bi-check-circle"></i> Todo al día</h4>
-        <p>No hay pedidos pendientes de despacho.</p>
+        <div class="opacity-25 display-1"><i class="bi bi-clipboard-check"></i></div>
+        <h4 class="mt-3">Bandeja Limpia</h4>
+        <p>No hay pedidos en esta etapa.</p>
     </div>
     {% endfor %}
 </div>
+
+<script>
+    function cambiarTipoEntrega(id, tipoActual) {
+        let nuevoTipo = (tipoActual === 'Envio') ? 'RECOJO' : 'ENVÍO';
+        
+        Swal.fire({
+            title: '¿Cambio de Planes?',
+            text: `La orden pasará a modalidad: ${nuevoTipo}. ¿Confirmar?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, cambiar',
+            confirmButtonColor: '#3085d6'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = `/logistica/cambiar_tipo_entrega/${id}`;
+            }
+        });
+    }
+
+    // --- FUNCIÓN AJAX PARA GUARDAR CHECK ---
+    function guardarCheck(detailId, checkbox) {
+        const row = document.getElementById('row_' + detailId);
+        if(checkbox.checked) { row.classList.add('table-success'); } 
+        else { row.classList.remove('table-success'); }
+
+        fetch(`/api/toggle_check/${detailId}`, { method: 'POST' })
+        .catch(err => console.error("Error guardando check", err));
+    }
+
+    function confirmarSalida(id) {
+        const form = document.getElementById(`form_despacho_${id}`);
+        // Validar campos requeridos (Peso, Bultos, Chofer)
+        if(!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        Swal.fire({
+            title: '¿Confirmar Despacho?',
+            text: "El pedido saldrá a ruta. Se generará el registro de salida.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Despachar',
+            confirmButtonColor: '#198754'
+        }).then((r) => {
+            if(r.isConfirmed) form.submit();
+        });
+    }
+</script>
+
+<style>
+    .blink-anim { animation: blinker 2s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0.5; } }
+    .table-striped > tbody > tr:nth-of-type(odd) > * { --bs-table-accent-bg: rgba(0, 0, 0, 0.02); }
+</style>
 {% endblock %}

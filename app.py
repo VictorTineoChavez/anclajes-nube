@@ -4,7 +4,9 @@ from models import ProductMovement
 from models import Payment
 from models import Category
 from datetime import datetime # Importante para la hora
+from flask import send_from_directory
 import pandas as pd
+import html
 from sqlalchemy.exc import IntegrityError # Para capturar el error del SKU
 from sqlalchemy import or_
 from sqlalchemy import func
@@ -14,6 +16,7 @@ from docxtpl import DocxTemplate, RichText # Importar librería de Word
 from werkzeug.utils import secure_filename
 from models import SystemConfig
 from num2words import num2words
+from sqlalchemy import text
 import os
 import io
 import requests
@@ -33,13 +36,19 @@ def registrar_log(accion, icono='bi-info-circle', color='text-primary'):
 
 app = Flask(__name__)
 
-# --- CONFIGURACIÓN ---
-# Esto crea un archivo 'importbolts.db' en tu carpeta automáticamente
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///importbolts.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'tesis_secreta_123' # Necesario para login y mensajes
+# --- CONFIGURACIÓN DE BASE DE DATOS (Inteligente para la Nube) ---
+# Intenta obtener la URL de Render/Railway. Si no existe, usa SQLite en tu PC.
+database_url = os.getenv('DATABASE_URL', 'sqlite:///importbolts.db')
 
-# Configuración de carpeta temporal para subidas (Agregalo después de app = Flask...)
+# Parche obligatorio para servidores en la nube (SQLAlchemy 1.4+)
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'tesis_secreta_123'
+
+# Configuración de carpeta temporal para subidas
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -57,45 +66,41 @@ def index():
     hoy = datetime.now().date()
     
     # --- DATOS COMUNES (Alertas de Stock) ---
-    # 1. Definir el límite de stock bajo
     UMBRAL_STOCK = 100 
-    
-    # 2. Contar el TOTAL REAL de productos bajos (Para el número grande en la tarjeta)
     total_alertas = Product.query.filter(Product.stock_actual < UMBRAL_STOCK).count()
-    
-    # 3. Traer solo una MUESTRA de 5 (Para la lista visual, no saturar)
     alertas_muestra = Product.query.filter(Product.stock_actual < UMBRAL_STOCK).limit(5).all()
     
     # ======================================================
     # VISTA 1: ADMIN Y ADMINISTRACIÓN (DASHBOARD BI GLOBAL)
     # ======================================================
     if rol in ['admin', 'administracion']:
-        # A. KPIs Financieros (Ventas Hoy y Mes)
+        # A. KPIs Financieros
         ventas_hoy = db.session.query(func.sum(Order.total)).filter(func.date(Order.fecha) == hoy).scalar() or 0
-        # SQLite usa strftime para extraer año-mes
         ventas_mes = db.session.query(func.sum(Order.total)).filter(func.strftime('%Y-%m', Order.fecha) == hoy.strftime('%Y-%m')).scalar() or 0
         pedidos_pendientes = Order.query.filter(Order.estado == 'Pendiente').count()
         
-        # B. Ranking de Vendedores (Top 5)
+        # B. Ranking de Vendedores (CORREGIDO AQUÍ)
         ranking = db.session.query(
             User.username, 
-            User.nombre_completo, # Agregamos nombre real para que se vea mejor
+            User.nombre_completo, 
             func.sum(Order.total).label('total_vendido'),
-            func.count(Order.id).label('cantidad_ventas') # Dato extra: cuántos pedidos hizo
-        ).join(Order).group_by(User.id).order_by(func.sum(Order.total).desc()).all()
+            func.count(Order.id).label('cantidad_ventas')
+        ).join(Order, User.id == Order.vendedor_id) \
+         .filter(Order.estado != 'Anulado') \
+         .group_by(User.id) \
+         .order_by(text('total_vendido DESC')) \
+         .limit(5).all()
         
-        # C. Productos Más Vendidos (Top 5 para Gráfico)
+        # C. Productos Más Vendidos
         top_productos = db.session.query(
             Product.nombre,
             func.sum(OrderDetail.cantidad).label('total_qty')
-        ).join(OrderDetail).group_by(Product.nombre).order_by(func.sum(OrderDetail.cantidad).desc()).limit(5).all()
+        ).join(OrderDetail).group_by(Product.nombre).order_by(text('total_qty DESC')).limit(5).all()
         
-        # D. ALGORITMO DE PREDICCIÓN (Proyección a fin de mes)
+        # D. Predicción
         dias_transcurridos = hoy.day
-        # Evitar división por cero si es día 1
         promedio_diario = ventas_mes / dias_transcurridos if dias_transcurridos > 0 else 0
-        dias_totales_mes = 30 
-        prediccion_fin_mes = promedio_diario * dias_totales_mes
+        prediccion_fin_mes = promedio_diario * 30
         
         return render_template('dashboard_admin.html', 
                                ventas_hoy=ventas_hoy,
@@ -104,7 +109,6 @@ def index():
                                ranking=ranking,
                                top_productos=top_productos,
                                prediccion=prediccion_fin_mes,
-                               # Pasamos las alertas corregidas:
                                alertas=alertas_muestra,      
                                total_alertas=total_alertas)
 
@@ -112,12 +116,10 @@ def index():
     # VISTA 2: VENDEDOR (MI RENDIMIENTO PERSONAL)
     # ======================================================
     elif rol == 'vendedor':
-        # Ventas filtradas por MI ID
         mis_ventas_hoy = db.session.query(func.sum(Order.total)).filter(Order.vendedor_id == user_id, func.date(Order.fecha) == hoy).scalar() or 0
         mis_ventas_mes = db.session.query(func.sum(Order.total)).filter(Order.vendedor_id == user_id, func.strftime('%Y-%m', Order.fecha) == hoy.strftime('%Y-%m')).scalar() or 0
         mis_pendientes = Order.query.filter_by(vendedor_id=user_id, estado='Pendiente').count()
         
-        # Mis últimas 5 cotizaciones
         mis_ultimas = Order.query.filter_by(vendedor_id=user_id).order_by(Order.fecha.desc()).limit(5).all()
         
         return render_template('dashboard_vendedor.html', 
@@ -130,12 +132,10 @@ def index():
     # VISTA 3: ALMACÉN (LOGÍSTICA OPERATIVA)
     # ======================================================
     else: # Almacen
-        # KPIs Logísticos
         por_despachar = Order.query.filter(Order.estado == 'Pendiente').count()
         en_ruta = Order.query.filter(Order.estado == 'Despachado').count()
         entregados_hoy = Order.query.filter(Order.estado == 'Entregado', func.date(Order.fecha) == hoy).count()
         
-        # Lista Prioritaria (Ordenada por Fecha de Entrega más próxima)
         prioritarios = Order.query.filter(Order.estado == 'Pendiente').order_by(Order.fecha_entrega.asc()).limit(5).all()
         
         return render_template('dashboard_almacen.html', 
@@ -143,7 +143,6 @@ def index():
                                en_ruta=en_ruta,
                                entregados=entregados_hoy,
                                prioritarios=prioritarios,
-                               # Pasamos las alertas corregidas:
                                alertas=alertas_muestra,
                                total_alertas=total_alertas)
 
@@ -176,7 +175,6 @@ def consulta_documento():
         
         # INTERVALO RECOMENDADO: 24 HORAS
         if horas_pasadas < 24:
-            # Lógica para mostrar mensaje bonito (Minutos vs Horas)
             usuario_anterior = getattr(cliente_db, 'updated_by', 'Sistema')
             
             if horas_pasadas < 1:
@@ -222,7 +220,7 @@ def consulta_documento():
         response = requests.get(url, headers={'Authorization': f'Bearer {TOKEN}'}, timeout=5)
         data = response.json()
         
-        if response.status_code == 200:
+        if response.status_code == 200: 
             razon = ""
             direccion = ""
             estado = "ACTIVO"
@@ -230,11 +228,18 @@ def consulta_documento():
 
             if len(numero) == 8: # DNI
                 if 'nombres' in data:
-                    razon = f"{data.get('nombres')} {data.get('apellidoPaterno')} {data.get('apellidoMaterno')}"
+                    raw_name = f"{data.get('nombres')} {data.get('apellidoPaterno')} {data.get('apellidoMaterno')}"
+                    razon = html.unescape(raw_name) # Limpieza DNI
                     direccion = "-" 
             else: # RUC
-                razon = data.get('razon_social') or data.get('razonSocial') or data.get('nombre') or ''
-                direccion = data.get('direccion', '')
+                # Obtenemos dato crudo
+                raw_razon = data.get('razon_social') or data.get('razonSocial') or data.get('nombre') or ''
+                # LIMPIEZA AQUÍ (Esto arregla el &amp;)
+                razon = html.unescape(raw_razon)
+                
+                raw_dir = data.get('direccion', '')
+                direccion = html.unescape(raw_dir)
+                
                 estado = data.get('estado', 'ACTIVO')
                 condicion = data.get('condicion', 'HABIDO')
 
@@ -497,6 +502,7 @@ def login():
             session['user_id'] = user.id
             session['role'] = user.role
             session['username'] = user.username
+            session['nombre'] = user.nombre_completo
             return redirect(url_for('index'))
         else:
             flash('Usuario o contraseña incorrectos')
@@ -810,50 +816,144 @@ def gestion_usuarios():
     usuarios = User.query.all()
     return render_template('usuarios.html', usuarios=usuarios)
 
+# --- EN APP.PY ---
+
 @app.route('/usuarios/guardar', methods=['POST'])
 def guardar_usuario():
     if session.get('role') != 'admin': return "Acceso denegado", 403
     
+    # 1. CAPTURA DE DATOS
     user_id = request.form.get('user_id')
-    username = request.form['username']
-    nombre = request.form['nombre_completo']
+    
+    # Datos personales
+    nombres = request.form.get('nombres', '').strip().title()
+    apellidos = request.form.get('apellidos', '').strip().title()
+    
+    # Si estamos editando y usan el formulario viejo, recuperamos nombre_completo directo
+    nombre_completo_form = request.form.get('nombre_completo', '').strip()
+    
+    # Lógica: Si hay nombres separados, los unimos. Si no, usamos el completo.
+    if nombres and apellidos:
+        nombre_final = f"{nombres} {apellidos}"
+    else:
+        nombre_final = nombre_completo_form
+
+    # Credenciales y Contacto
+    username = request.form['username'].strip().lower() # Siempre minúsculas
     password = request.form['password']
     rol = request.form['role']
-    # --- CAPTURAMOS CELULAR ---
-    celular = request.form.get('celular')
-    cargo = request.form.get('cargo_formal')
-    email = request.form.get('email_empresa')
+    celular = request.form.get('celular', '').strip()
+    cargo = request.form.get('cargo_formal', '').strip().upper()
+    email = request.form.get('email_empresa', '').strip().lower()
     
     try:
+        # 2. VALIDACIONES DE NEGOCIO (BACKEND)
+        
+        # A. Validación de Celular Perú (9 dígitos, empieza con 9)
+        if celular:
+            if not celular.isdigit() or len(celular) != 9 or not celular.startswith('9'):
+                flash('⛔ Error: El celular debe tener 9 dígitos y empezar con 9.', 'error')
+                return redirect(url_for('gestion_usuarios'))
+
+        # B. Validación de Duplicados (Username)
+        # Buscamos si existe alguien con ese usuario, PERO que no sea el mismo que estamos editando
+        usuario_existente = User.query.filter_by(username=username).first()
+        if usuario_existente:
+            # Si es nuevo (no hay user_id) O si es edición pero el ID es diferente
+            if not user_id or (user_id and usuario_existente.id != int(user_id)):
+                flash(f'⛔ Error: El usuario "{username}" ya existe. Elija otro.', 'error')
+                return redirect(url_for('gestion_usuarios'))
+
+        # 3. GUARDADO / ACTUALIZACIÓN
         if user_id:
+            # --- EDICIÓN ---
             usuario = User.query.get_or_404(user_id)
             usuario.username = username
-            usuario.nombre_completo = nombre
+            usuario.nombre_completo = nombre_final
             usuario.role = rol
-            usuario.celular = celular # Guardamos celular
+            usuario.celular = celular
             usuario.cargo_formal = cargo
             usuario.email_empresa = email
             
             if password:
                 usuario.password = password
-                flash(f'Usuario actualizado con contraseña nueva.')
+                flash(f'✅ Perfil de {nombres} actualizado con nueva contraseña.')
             else:
-                flash(f'Usuario actualizado.')
+                flash(f'✅ Perfil de {nombres} actualizado.')
         else:
+            # --- CREACIÓN ---
             if not password:
-                flash('La contraseña es obligatoria para nuevos usuarios.')
+                flash('⛔ Error: La contraseña es obligatoria para nuevos usuarios.', 'error')
                 return redirect(url_for('gestion_usuarios'))
                 
-            nuevo = User(username=username, nombre_completo=nombre, password=password, role=rol, celular=celular,cargo_formal=cargo, email_empresa=email)
+            nuevo = User(
+                username=username, 
+                nombre_completo=nombre_final, 
+                password=password, 
+                role=rol, 
+                celular=celular,
+                cargo_formal=cargo, 
+                email_empresa=email
+            )
             db.session.add(nuevo)
-            flash(f'Usuario creado exitosamente.')
+            flash(f'✅ Usuario "{username}" creado exitosamente.')
             
         db.session.commit()
+
     except Exception as e:
         db.session.rollback()
-        flash(f'Error: {str(e)}')
+        flash(f'Error crítico: {str(e)}', 'error')
         
     return redirect(url_for('gestion_usuarios'))
+
+
+# --- EN APP.PY ---
+
+@app.route('/perfil', methods=['GET', 'POST'])
+def perfil_usuario():
+    if 'user_id' not in session: return redirect(url_for('login'))
+    
+    usuario = User.query.get_or_404(session['user_id'])
+    
+    if request.method == 'POST':
+        try:
+            # 1. ACTUALIZAR DATOS PERSONALES
+            # El usuario no puede cambiar su Login ni su Rol, solo datos de contacto
+            usuario.nombre_completo = request.form['nombre_completo'].strip().title()
+            usuario.celular = request.form.get('celular', '').strip()
+            usuario.email_empresa = request.form.get('email_empresa', '').strip().lower()
+            
+            # 2. CAMBIO DE CONTRASEÑA (Lógica Segura)
+            pass_actual = request.form.get('current_password')
+            pass_nueva = request.form.get('new_password')
+            pass_confirm = request.form.get('confirm_password')
+            
+            if pass_nueva: # Si intentó escribir una nueva clave
+                if not pass_actual:
+                    flash('⛔ Para cambiar la contraseña, debe ingresar su contraseña actual.', 'error')
+                    return redirect(url_for('perfil_usuario'))
+                
+                if usuario.password != pass_actual:
+                    flash('⛔ La contraseña actual ingresada es incorrecta.', 'error')
+                    return redirect(url_for('perfil_usuario'))
+                    
+                if pass_nueva != pass_confirm:
+                    flash('⛔ Las nuevas contraseñas no coinciden.', 'error')
+                    return redirect(url_for('perfil_usuario'))
+                
+                # Si todo ok, cambiamos la clave
+                usuario.password = pass_nueva
+                flash('✅ Contraseña actualizada correctamente.', 'success')
+            
+            db.session.commit()
+            flash('✅ Datos de perfil actualizados.', 'success')
+            return redirect(url_for('perfil_usuario'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar: {str(e)}', 'error')
+
+    return render_template('perfil.html', u=usuario)
 
 @app.route('/usuarios/eliminar/<int:user_id>')
 def eliminar_usuario(user_id):
@@ -1083,12 +1183,38 @@ def nueva_venta():
                            updated_at=config_tc.updated_at.strftime('%d/%m %H:%M') if config_tc else None,
                            updated_by=config_tc.updated_by if config_tc else None)
 
+# --- EN APP.PY (Función DESCARGAR MAESTRA) ---
+
 @app.route('/descargar_cotizacion/<int:order_id>')
 def descargar_cotizacion(order_id):
     # 1. Obtener datos básicos
     orden = Order.query.get_or_404(order_id)
-    doc = DocxTemplate("plantilla_cotizacion.docx")
     vendedor = orden.vendedor
+    
+    # --- A. LÓGICA DE PLANTILLA Y MODO (NUEVO) ---
+    modo = request.args.get('modo', 'default') # 'almacen', 'valorizado', o 'default'
+    es_aprobado = orden.estado in ['Aprobado', 'Despachado', 'Entregado']
+    
+    # Configuración por defecto
+    template_name = "plantilla_cotizacion.docx"
+    titulo_doc = "COTIZACIÓN"
+    codigo_visual = f"COT-{orden.id:05d}"
+    mostrar_precios = True
+
+    if es_aprobado:
+        # ES UNA ORDEN DE PEDIDO (OP)
+        template_name = "plantilla_orden_pedido.docx" # Asegúrate de crear este archivo (copia del otro)
+        titulo_doc = "ORDEN DE PEDIDO"
+        codigo_visual = f"OP-{orden.id:05d}"
+        
+        if modo == 'almacen':
+            mostrar_precios = False
+            titulo_doc += " (ALMACÉN)"
+    
+    # Cargar la plantilla seleccionada
+    doc = DocxTemplate(template_name)
+
+    # --- B. PROCESAMIENTO DE DATOS (TU LÓGICA ORIGINAL) ---
     
     # Datos del vendedor
     cargo_mostrar = vendedor.cargo_formal if vendedor.cargo_formal else "Asesor Comercial"
@@ -1097,7 +1223,7 @@ def descargar_cotizacion(order_id):
 
     subtotal_bruto = orden.subtotal + orden.descuento_total
 
-    # Lógica inteligente para Fecha de Entrega
+    # Fecha de Entrega
     texto_entrega = "Inmediata / A coordinar"
     if orden.fecha_entrega:
         texto_entrega = orden.fecha_entrega.strftime("%d/%m/%Y")
@@ -1105,22 +1231,16 @@ def descargar_cotizacion(order_id):
     simbolo = "S/" if orden.moneda == 'PEN' else "$"
     nombre_moneda = "SOLES" if orden.moneda == 'PEN' else "DOLARES AMERICANOS"
 
-    # 2. PROCESAMIENTO DE ITEMS
+    # Procesamiento de Items
     lista_items = []
     i = 1
     
     for d in orden.details:
-        
-        # --- A. LÓGICA DE SKU (SUPER ROBUSTA) ---
-        sku_final = "SERV" # Valor por defecto
-        
+        # Lógica de SKU
+        sku_final = "SERV"
         if d.product:
-            # PRIORIDAD 1: Si está vinculado (Productos o Servicios Nuevos guardados bien)
             sku_final = d.product.sku
-            
         elif d.item_type == 'FABRICACION':
-            # PRIORIDAD 2: Si es un servicio antiguo o manual
-            # Mapa de SKUs fijos para lo clásico
             mapa_skus = {
                 'SERVICIO DE CORTE': 'SRV-CORT',
                 'SERVICIO DE SOLDADURA': 'SRV-SOLD',
@@ -1131,58 +1251,39 @@ def descargar_cotizacion(order_id):
                 'SERVICIO GENERAL': 'SRV-GEN'
             }
             titulo_limpio = d.nombre_personalizado_titulo.upper() if d.nombre_personalizado_titulo else ""
+            sku_final = mapa_skus.get(titulo_limpio, 'SRV-GEN')
             
-            # Buscamos en el mapa fijo
-            sku_encontrado = mapa_skus.get(titulo_limpio)
-            
-            if sku_encontrado:
-                sku_final = sku_encontrado
-            else:
-                # PRIORIDAD 3 (RED DE SEGURIDAD): Buscar en BD por nombre si no se vinculó ID
+            # Intento de rescate por BD si falló el mapa
+            if sku_final == 'SRV-GEN':
                 prod_db = Product.query.filter_by(nombre=titulo_limpio).first()
-                if prod_db:
-                    sku_final = prod_db.sku # ¡Recuperamos SERV-LIMP!
-                else:
-                    sku_final = 'SRV-GEN'   # Solo si falla todo, ponemos GEN
-            
+                if prod_db: sku_final = prod_db.sku
+
         elif d.item_type == 'GLB':
             sku_final = "GLB-001" 
 
-        # --- B. LÓGICA DE DESCRIPCIÓN (RichText con Negritas) ---
+        # Lógica RichText (Descripción)
         descripcion_rich = RichText()
-        estilo_fuente = {'font': 'Calibri', 'size': 18} # Ajusta el tamaño (18 es aprox 9pt en Word)
+        estilo_fuente = {'font': 'Calibri', 'size': 18} # ~9pt
 
         if d.product and d.item_type == 'PRODUCTO':
-            # Caso 1: Producto de Inventario (Texto plano)
             descripcion_rich.add(d.product.nombre, **estilo_fuente)
         else:
-            # Caso 2: Servicio o GLB (Formato Especial Negrita + Normal)
             titulo = d.nombre_personalizado_titulo.upper() if d.nombre_personalizado_titulo else ""
-            # Forzamos MAYÚSCULAS en el cuerpo del texto
             cuerpo = d.nombre_personalizado.upper() if d.nombre_personalizado else "" 
             
-            # 1. TÍTULO EN NEGRITA
             if titulo:
                 descripcion_rich.add(titulo, bold=True, **estilo_fuente)
-                
-                # 2. ESPACIO SEPARADOR
-                if cuerpo:
-                    descripcion_rich.add(" ", **estilo_fuente) 
-
-            # 3. CUERPO NORMAL (YA EN MAYÚSCULAS)
+                if cuerpo: descripcion_rich.add(" ", **estilo_fuente) 
             if cuerpo:
                 descripcion_rich.add(cuerpo, **estilo_fuente)
 
-        # --- C. LÓGICA DE UNIDAD DE MEDIDA ---
+        # Unidad de Medida
         unidad_final = "UND" 
-        if d.item_type == 'FABRICACION':
-            unidad_final = "SRV"
-        elif d.item_type == 'GLB':
-            unidad_final = "GLB"
+        if d.item_type == 'FABRICACION': unidad_final = "SRV"
+        elif d.item_type == 'GLB': unidad_final = "GLB"
         elif d.product and hasattr(d.product, 'unidad_medida'): 
             unidad_final = d.product.unidad_medida or "UND"
         
-        # --- D. AGREGAR A LA LISTA FINAL ---
         lista_items.append({
             'item': i,
             'sku': sku_final,
@@ -1194,7 +1295,7 @@ def descargar_cotizacion(order_id):
         })
         i += 1
     
-    # 3. Conversión a letras
+    # Conversión a letras
     try:
         total_float = float(orden.total)
         parte_entera = int(total_float)
@@ -1204,11 +1305,15 @@ def descargar_cotizacion(order_id):
     except:
         total_letras = "---"
 
-    # 4. Contexto para Word
+    # --- 3. CONTEXTO FINAL (Fusionado) ---
     context = {
+        # Variables de Configuración (NUEVAS)
+        'titulo_documento': titulo_doc,
+        'codigo_pedido': codigo_visual,
+        'mostrar_precios': mostrar_precios, # Variable clave para el IF en Word
+
+        # Variables de Datos (ORIGINALES)
         'fecha': orden.fecha.strftime("%d/%m/%Y"),
-        'codigo_pedido': f"{orden.id:06d}", 
-        
         'cliente_nombre': orden.cliente.nombre,
         'cliente_ruc': orden.cliente.documento,
         'cliente_direccion_fiscal': orden.cliente.direccion,
@@ -1230,8 +1335,8 @@ def descargar_cotizacion(order_id):
         'subtotal_bruto': f"{subtotal_bruto:,.2f}",
         'label_descuento': f"Descuento ({int(orden.descuento_valor)}%)" if orden.descuento_tipo == 'PORCENTAJE' else "Descuento",
         'monto_descuento': f"- {orden.descuento_total:,.2f}",
-        'subtotal_neto': f"{orden.subtotal:,.2f}",
-        'subtotal': f"{orden.subtotal:,.2f}",
+        'subtotal_neto': f"{orden.subtotal:,.2f}", # Valor Venta
+        'subtotal': f"{orden.subtotal:,.2f}",      # Subtotal
         'igv': f"{orden.igv:,.2f}",
         'total': f"{orden.total:,.2f}",
         'son_letras': total_letras,
@@ -1242,9 +1347,75 @@ def descargar_cotizacion(order_id):
     }
     
     doc.render(context)
-    nombre_archivo = f"Cotizacion_{orden.id}.docx"
-    doc.save(nombre_archivo)
-    return send_file(nombre_archivo, as_attachment=True)
+    
+    # Nombre del archivo dinámico
+    suffix = "_ALMACEN" if modo == 'almacen' else ""
+    nombre_archivo = f"{codigo_visual}_{orden.cliente.nombre[:10]}{suffix}.docx"
+    
+    # Limpiar caracteres raros del nombre de archivo
+    nombre_archivo = "".join([c for c in nombre_archivo if c.isalnum() or c in (' ', '.', '-', '_')]).strip()
+
+    output = io.BytesIO()
+    doc.save(output)
+    output.seek(0)
+    
+    return send_file(
+        output, 
+        as_attachment=True, 
+        download_name=nombre_archivo,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
+
+
+# --- ZONA DE ARCHIVOS ORDEN DE COMPRA (CLIENTE) ---
+
+# --- EN APP.PY (Ruta corregida para actualizaciones parciales) ---
+
+@app.route('/subir_oc/<int:order_id>', methods=['POST'])
+def subir_oc(order_id):
+    if 'user_id' not in session: return {'status': 'error', 'msg': 'Login requerido'}, 401
+    
+    orden = Order.query.get_or_404(order_id)
+    
+    # Variables de control
+    msg_exito = []
+    
+    # 1. ACTUALIZAR NÚMERO (Solo si se envió la clave 'numero_oc_manual')
+    if 'numero_oc_manual' in request.form:
+        nuevo_numero = request.form.get('numero_oc_manual').strip().upper()
+        orden.orden_compra = nuevo_numero
+        msg_exito.append("Número actualizado")
+
+    # 2. ACTUALIZAR ARCHIVO (Solo si se envió un archivo)
+    archivo = request.files.get('archivo_pdf')
+    if archivo and archivo.filename != '':
+        # Validar
+        if not archivo.filename.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')):
+            return {'status': 'error', 'msg': 'Formato no válido (Use PDF o Imagen)'}
+
+        # Guardar
+        ext = archivo.filename.split('.')[-1]
+        nombre_limpio = secure_filename(f"OC_{orden.id:05d}_{orden.cliente.nombre[:10]}.{ext}")
+        path_destino = os.path.join(app.config['UPLOAD_FOLDER'], nombre_limpio)
+        archivo.save(path_destino)
+        
+        orden.archivo_oc = nombre_limpio
+        msg_exito.append("Archivo subido")
+
+    try:
+        db.session.commit()
+        return {'status': 'success', 'msg': " y ".join(msg_exito) if msg_exito else "Sin cambios"}
+    except Exception as e:
+        db.session.rollback()
+        return {'status': 'error', 'msg': str(e)}
+
+@app.route('/ver_oc/<filename>')
+def ver_oc(filename):
+    # Sirve el archivo para descargar/ver
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# --- IMPORTANTE: ASEGURATE DE IMPORTAR send_from_directory ARRIBA ---
+# from flask import send_from_directory
 
 @app.route('/categoria/nueva', methods=['POST'])
 def nueva_categoria():
@@ -1723,10 +1894,16 @@ def ver_kardex():
     if cat_nombre and cat_nombre != 'todas':
         query = query.filter(Product.categoria == cat_nombre)
 
-    # 3. NUEVO: Filtro por Tipo (Entrada/Salida)
+    # 3. Filtro por Tipo (Entrada/Salida)
     tipo_mov = request.args.get('tipo')
     if tipo_mov and tipo_mov in ['ENTRADA', 'SALIDA']:
         query = query.filter(ProductMovement.tipo == tipo_mov)
+
+    # ---> NUEVO: FILTRO PARA OCULTAR SALDOS INICIALES <---
+    ocultar_iniciales = request.args.get('ocultar_iniciales')
+    if ocultar_iniciales == 'on':
+        # Filtramos excluyendo (~) los motivos que contengan la palabra "Inicial"
+        query = query.filter(~ProductMovement.motivo.ilike('%Inicial%'))
 
     # 4. Filtro por Rango de Fechas
     fecha_inicio = request.args.get('fecha_inicio')
@@ -1737,43 +1914,101 @@ def ver_kardex():
         end = datetime.strptime(fecha_fin + " 23:59:59", '%Y-%m-%d %H:%M:%S')
         query = query.filter(ProductMovement.fecha.between(start, end))
         
-    # Ordenar: Más reciente primero y Limitar resultados para velocidad
-    movimientos = query.order_by(ProductMovement.fecha.desc()).limit(1000).all()
+    # --- NUEVO: PAGINACIÓN (En vez del limit) ---
+    query = query.order_by(ProductMovement.fecha.desc())
     
+    page = request.args.get('page', 1, type=int)
+    per_page = 25 # Muestra 25 movimientos por página
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    movimientos = pagination.items
     categorias = Category.query.all()
     
-    return render_template('kardex.html', movimientos=movimientos, categorias=categorias)
+    return render_template('kardex.html', 
+                           movimientos=movimientos, 
+                           categorias=categorias,
+                           pagination=pagination) # Pasamos la info de las páginas al HTML
 
 @app.route('/despachos')
 def despachos():
+    # Permitimos acceso a admin y almacen (y chofer si quieres que vean su historial)
+    if session.get('role') not in ['admin', 'almacen', 'chofer']: return "Acceso denegado", 403
+    
+    vista = request.args.get('vista', 'pendientes')
+    query = Order.query
+    
+    # 1. Filtros básicos por estado
+    if vista == 'pendientes':
+        query = query.filter(Order.estado == 'Aprobado')
+    elif vista == 'proceso':
+        query = query.filter(Order.estado == 'En Preparacion')
+    elif vista == 'finalizados':
+        query = query.filter(Order.estado.in_(['Despachado', 'Entregado']))
+
+    # 2. Ordenamiento
+    modo_orden = request.args.get('ordenar_por', 'urgencia')
+    if modo_orden == 'urgencia':
+        query = query.order_by(Order.fecha_entrega.asc())
+    else:
+        query = query.order_by(Order.fecha.asc())
+
+    # 3. Límite para historial
+    if vista == 'finalizados':
+        query = query.limit(50)
+
+    ordenes = query.all()
+    
+    # --- 🔴 NUEVO: CARGAR LA LISTA DE CHOFERES ---
+    # Esto es lo que te faltaba. Busca todos los usuarios con rol 'chofer'
+    choferes = User.query.filter_by(role='chofer').all()
+    
+    # Contadores
+    count_pend = Order.query.filter(Order.estado == 'Aprobado').count()
+    count_proc = Order.query.filter(Order.estado == 'En Preparacion').count()
+    
+    return render_template('despachos.html', 
+                           ordenes=ordenes, 
+                           vista_actual=vista,
+                           orden_actual=modo_orden,
+                           c_pend=count_pend,
+                           c_proc=count_proc,
+                           hoy=datetime.now().date(),
+                           choferes=choferes) # <--- 🔴 IMPORTANTE: ENVIARLOS AQUI
+
+# --- EN APP.PY ---
+
+@app.route('/logistica/cambiar_tipo_entrega/<int:order_id>')
+def cambiar_tipo_entrega(order_id):
     if session.get('role') not in ['admin', 'almacen']: return "Acceso denegado", 403
     
-    # Obtener el parámetro de ordenamiento de la URL (por defecto 'urgencia')
-    modo_orden = request.args.get('ordenar_por', 'urgencia')
+    orden = Order.query.get_or_404(order_id)
     
-    # Consulta base: Solo pedidos que NO han sido entregados (Pendientes o Despachados)
-    query = Order.query.filter(Order.estado != 'Entregado')
-    
-    # Lógica de Priorización
-    if modo_orden == 'urgencia':
-        # Ordenar por fecha de entrega ASCENDENTE (Lo más cercano a vencer primero)
-        query = query.order_by(Order.fecha_entrega.asc())
-    elif modo_orden == 'ganancia':
-        # Ordenar por total DESCENDENTE (Las ventas más grandes primero)
-        query = query.order_by(Order.total.desc())
+    # Lógica de switch simple
+    if orden.tipo_entrega == 'Envio':
+        orden.tipo_entrega = 'Recojo'
+        # Limpiamos dirección si quieres, o la dejas por si se arrepiente de nuevo
+        flash(f'Orden #{order_id} cambiada a RECOJO EN TIENDA.')
     else:
-        # Por defecto: Ordenar por fecha de creación (FIFO)
-        query = query.order_by(Order.fecha.asc())
-        
-    ordenes_pendientes = query.all()
+        orden.tipo_entrega = 'Envio'
+        flash(f'Orden #{order_id} cambiada a ENVÍO A DOMICILIO.')
     
-    # Pasamos 'hoy' para que la plantilla sepa pintar de rojo los vencidos
-    return render_template(
-        'despachos.html', 
-        ordenes=ordenes_pendientes, 
-        orden_actual=modo_orden, 
-        hoy=datetime.now().date()
-    )
+    db.session.commit()
+    
+    # Volvemos a la misma pantalla de despachos
+    return redirect(url_for('despachos', vista='proceso'))
+
+# --- NUEVA RUTA: CAMBIAR A "EN PREPARACIÓN" ---
+@app.route('/iniciar_picking/<int:order_id>')
+def iniciar_picking(order_id):
+    if session.get('role') not in ['admin', 'almacen']: return "Acceso denegado", 403
+    
+    orden = Order.query.get_or_404(order_id)
+    if orden.estado == 'Aprobado':
+        orden.estado = 'En Preparacion'
+        # Aquí podrías guardar quién lo inició: orden.almacenero_id = session['user_id']
+        db.session.commit()
+        
+    return redirect(url_for('despachos', vista='proceso'))
 
 @app.route('/cobranzas')
 def cobranzas():
@@ -1834,37 +2069,34 @@ def registrar_pago():
 
 @app.route('/cambiar_estado/<int:order_id>/<nuevo_estado>')
 def cambiar_estado(order_id, nuevo_estado):
-    # 1. Verificar sesión
-    if 'user_id' not in session: return "No logueado", 401
+    if 'user_id' not in session: return {'status': 'error', 'msg': 'Login requerido'}, 401
     
-    rol = session.get('role')
-    user_id = session.get('user_id')
     orden = Order.query.get_or_404(order_id)
-
-    # 2. REGLAS DE PERMISOS (LÓGICA DE NEGOCIO)
-    permiso_concedido = False
-
-    # CASO A: Admin o Almacén (Tienen poder casi total)
-    if rol in ['admin', 'almacen', 'administracion']:
-        permiso_concedido = True
+    orden.estado = nuevo_estado
     
-    # CASO B: Vendedor (Solo puede enviar SU cotización a aprobación)
-    elif rol == 'vendedor':
-        # Solo puede cambiar si la orden es SUYA
-        if orden.vendedor_id == user_id:
-            # Y solo si está pasando de 'Cotizacion'/'Observado' A 'Pendiente Aprobacion'
-            # O si quiere anularla
-            if nuevo_estado in ['Pendiente Aprobacion', 'Anulado']:
-                permiso_concedido = True
+    # --- NUEVO: GUARDAR DATOS DE ALMACÉN (Si se enviaron) ---
+    peso = request.args.get('peso_kardex')
+    bultos = request.args.get('bultos')
+    
+    if peso: orden.peso_total = peso # Asegúrate de tener esta columna en tu modelo
+    if bultos: orden.cantidad_bultos = bultos # Asegúrate de tener esta columna en tu modelo
+    
+    db.session.commit()
+    
+    # --- NUEVO: SISTEMA DE REDIRECCIÓN ---
+    # Si la petición viene con ?origin=despachos, hacemos redirect en vez de JSON
+    origen = request.args.get('origin')
+    
+    if origen == 'despachos':
+        # Si despachamos o entregamos, vamos a la pestaña de finalizados
+        if nuevo_estado in ['Despachado', 'Entregado']:
+            return redirect(url_for('despachos', vista='finalizados'))
+        else:
+            return redirect(url_for('despachos', vista='proceso'))
+            
+    # Si viene de Historial Ventas (AJAX), devolvemos JSON como siempre
+    return {'status': 'success', 'msg': f'Estado actualizado a {nuevo_estado}'}
 
-    # 3. EJECUCIÓN
-    if permiso_concedido:
-        orden.estado = nuevo_estado
-        db.session.commit()
-        # Si es fetch API, deberíamos retornar JSON, pero como tu JS espera texto/redirect:
-        return {'status': 'success', 'msg': f'Estado actualizado a {nuevo_estado}'}
-    else:
-        return {'status': 'error', 'msg': 'No tiene permisos para realizar esta acción.'}, 403
 @app.route('/reportes_predicciones')
 def reportes_predicciones():
     if session.get('role') not in ['admin', 'administracion']: return "Acceso denegado", 403
@@ -1908,6 +2140,21 @@ def reportes_predicciones():
     reporte = sorted(reporte, key=lambda k: k['prediccion_prox_mes'], reverse=True)
     
     return render_template('reportes_predicciones.html', data=reporte, hoy=datetime.now())
+
+# --- EN APP.PY ---
+
+@app.route('/api/toggle_check/<int:detail_id>', methods=['POST'])
+def toggle_check(detail_id):
+    if 'user_id' not in session: return {'status': 'error'}, 401
+    
+    # Buscamos el item específico
+    detalle = OrderDetail.query.get_or_404(detail_id)
+    
+    # Invertimos el valor (Si es True pasa a False, y viceversa)
+    detalle.check_almacen = not detalle.check_almacen
+    db.session.commit()
+    
+    return {'status': 'success', 'nuevo_estado': detalle.check_almacen}
 
 # API SECRETA PARA CONSULTAR PRECIO EN VIVO (AJAX)
 @app.route('/api/check_precio/<int:product_id>/<int:cantidad>')
@@ -2019,7 +2266,7 @@ def editar_categoria():
 
 @app.route('/gestion_ventas/aprobar/<int:order_id>', methods=['POST'])
 def aprobar_cotizacion_gerencia(order_id):
-    # Seguridad: Solo Admin/Gerencia puede aprobar y mover inventario
+    # Seguridad: Solo Admin/Gerencia puede aprobar
     if session.get('role') not in ['admin', 'administracion']: 
         return {'status': 'error', 'msg': 'No tiene permisos de Gerencia'}, 403
 
@@ -2027,21 +2274,18 @@ def aprobar_cotizacion_gerencia(order_id):
 
     # Validación: No aprobar dos veces
     if orden.estado == 'Aprobado':
-        return {'status': 'error', 'msg': 'Esta orden ya fue aprobada y procesada.'}
+        return {'status': 'error', 'msg': 'Esta orden ya fue aprobada.'}
 
     try:
-        # 1. VERIFICACIÓN DE STOCK FINAL (RACE CONDITION CHECK)
-        # Antes de aprobar, verificamos por última vez si hay stock físico
+        # 1. VERIFICACIÓN DE STOCK VISUAL (Solo advierte si falta algo, pero NO descuenta)
         errores_stock = []
         
         for detalle in orden.details:
-            # Solo validamos si es PRODUCTO o KIT (GLB)
-            if detalle.product_id: # Es un producto directo
+            if detalle.product_id: 
                 prod = Product.query.get(detalle.product_id)
                 if prod.stock_actual < detalle.cantidad:
                     errores_stock.append(f"{prod.nombre} (Faltan {detalle.cantidad - prod.stock_actual})")
             
-            # Si es GLB, validar componentes (lógica simplificada aquí)
             if detalle.item_type == 'GLB':
                 for comp in detalle.kit_components:
                     prod_c = comp.product
@@ -2052,53 +2296,13 @@ def aprobar_cotizacion_gerencia(order_id):
         if errores_stock:
             return {'status': 'error', 'msg': 'Stock insuficiente al momento de aprobar: ' + ', '.join(errores_stock)}
 
-        # 2. EJECUCIÓN DE MOVIMIENTOS (KARDEX + DESCUENTO)
-        for detalle in orden.details:
-            # A. DESCUENTO PRODUCTO DIRECTO
-            if detalle.product_id and detalle.item_type == 'PRODUCTO':
-                prod = Product.query.get(detalle.product_id)
-                stock_anterior = prod.stock_actual
-                prod.stock_actual -= detalle.cantidad
-                
-                # Registro Kardex
-                kardex = ProductMovement(
-                    product_id=prod.id,
-                    user_id=session['user_id'],
-                    tipo='SALIDA',
-                    cantidad=detalle.cantidad,
-                    stock_anterior=stock_anterior,
-                    stock_nuevo=prod.stock_actual,
-                    motivo=f"Venta Aprobada NP-{orden.id:05d} (Cliente: {orden.cliente.nombre})"
-                )
-                db.session.add(kardex)
-
-            # B. DESCUENTO COMPONENTES DE KIT (GLB)
-            elif detalle.item_type == 'GLB':
-                for comp in detalle.kit_components:
-                    prod_c = comp.product
-                    cantidad_total = comp.cantidad_requerida * detalle.cantidad
-                    
-                    stock_ant_c = prod_c.stock_actual
-                    prod_c.stock_actual -= cantidad_total
-                    
-                    kardex_c = ProductMovement(
-                        product_id=prod_c.id,
-                        user_id=session['user_id'],
-                        tipo='SALIDA',
-                        cantidad=cantidad_total,
-                        stock_anterior=stock_ant_c,
-                        stock_nuevo=prod_c.stock_actual,
-                        motivo=f"Salida por Kit NP-{orden.id:05d} - {detalle.nombre_personalizado_titulo}"
-                    )
-                    db.session.add(kardex_c)
-
-        # 3. CAMBIO DE ESTADO
-        orden.estado = 'Aprobado' # Esto significa "Nota de Pedido"
-        orden.fecha_aprobacion = datetime.now() # Asegúrate de crear este campo en models si lo quieres
+        # 2. CAMBIO DE ESTADO (El stock NO se toca aquí)
+        orden.estado = 'Aprobado' 
+        orden.fecha_aprobacion = datetime.now() 
         
         db.session.commit()
         
-        return {'status': 'success', 'msg': f'Cotización aprobada. Se generó la Nota de Pedido NP-{orden.id:05d} y se descontó el stock.'}
+        return {'status': 'success', 'msg': f'Cotización aprobada. Se generó la Nota de Pedido NP-{orden.id:05d}. El pedido pasó a Almacén para su despacho.'}
 
     except Exception as e:
         db.session.rollback()
@@ -2115,48 +2319,55 @@ def historial_ventas():
     rol = session['role']
     user_id = session['user_id']
 
-    # Datos para filtros (Solo Admins ven lista de vendedores para filtrar histórico)
+    # Filtros fijos
     vendedores = []
     if rol in ['admin', 'administracion', 'almacen']:
         vendedores = User.query.filter_by(role='vendedor').all()
     
-    # Clientes para el select
-    clientes = Client.query.order_by(Client.nombre).limit(2000).all()
-
-    # Query Base
+    # 1. QUERY BASE
     query = Order.query
     
-    # 2. CONTADORES
+    # 2. CONTADORES (Para los globos rojos/amarillos)
     cuentas = {
         'rev': Order.query.filter_by(estado='Pendiente Aprobacion').count(),
         'obs': 0
     }
-    # Vendedor ve sus rechazados. Admin ve el total de pendientes globales.
     if rol == 'vendedor':
         cuentas['obs'] = Order.query.filter(Order.vendedor_id == user_id, Order.estado == 'Observado').count()
 
-    # 3. FILTROS Y VISTAS
-    busqueda = request.args.get('busqueda')
+    # --- 3. APLICAR LÓGICA DE PESTAÑAS (PRIMERO) ---
+    # Esto define "dónde" vamos a buscar.
+    
     vista = request.args.get('vista', 'borradores')
 
-    # Filtro Cliente (Select)
-    filtro_cliente_ruc = request.args.get('filtro_cliente')
-    cliente_obj_filtro = None
-    if filtro_cliente_ruc:
-        cliente_obj_filtro = Client.query.filter_by(documento=filtro_cliente_ruc).first()
-        if cliente_obj_filtro:
-            query = query.filter(Order.cliente_id == cliente_obj_filtro.id)
+    if vista == 'borradores':
+        query = query.filter(Order.estado.in_(['Cotizacion', 'Observado']))
+        # REGLA DE ORO: En borradores, CADA UNO VE SOLO LO SUYO.
+        # Así el Admin no ve el "ruido" de los borradores de Juan.
+        query = query.filter(Order.vendedor_id == user_id)
 
+    elif vista == 'revision':
+        query = query.filter(Order.estado == 'Pendiente Aprobacion')
+        # Admin ve todo. Vendedor solo lo suyo.
+        if rol == 'vendedor': query = query.filter(Order.vendedor_id == user_id)
+
+    elif vista == 'activos':
+        query = query.filter(Order.estado.in_(['Aprobado', 'Despachado']))
+        if rol == 'vendedor': query = query.filter(Order.vendedor_id == user_id)
+
+    elif vista == 'cerrados':
+        query = query.filter(Order.estado.in_(['Entregado', 'Anulado', 'Rechazado']))
+        if rol == 'vendedor': query = query.filter(Order.vendedor_id == user_id)
+
+    # --- 4. AHORA APLICAMOS LA BÚSQUEDA (SOBRE LA VISTA YA FILTRADA) ---
+    busqueda = request.args.get('busqueda')
+    
     if busqueda:
-        # --- BUSCADOR GLOBAL (AUDITORÍA) ---
-        # Si el Gerente busca explícitamente "Juan" o "Cotizacion 50", SÍ debe salir aunque sea borrador.
-        query = Order.query 
-        if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
-        
-        # Truco para buscar ID numérico
+        # Preparamos el ID numérico
         term_id = busqueda
         if busqueda.isdigit(): term_id = str(int(busqueda))
 
+        # Aplicamos el filtro de texto ENCIMA de los filtros de pestaña
         query = query.join(Client).join(User).filter(
             or_(
                 Client.nombre.ilike(f"%{busqueda}%"),
@@ -2166,36 +2377,18 @@ def historial_ventas():
                 func.cast(Order.id, db.String).like(f"%{term_id}%") 
             )
         )
-    else:
-        # --- LÓGICA DE BANDEJAS (EL CAMBIO ESTÁ AQUÍ) ---
-        
-        if vista == 'borradores':
-            query = query.filter(Order.estado.in_(['Cotizacion', 'Observado']))
-            
-            # CAMBIO CLAVE:
-            # Antes: if rol == 'vendedor': filter_by...
-            # Ahora: SIEMPRE filtramos por user_id en esta vista.
-            # Por qué: 
-            # 1. Vendedor: Ve sus borradores (Correcto).
-            # 2. Gerente: Ve SUS propios borradores (si vende). NO ve los de otros.
-            # Resultado: El gerente tendrá esta bandeja limpia de ruido ajeno.
-            query = query.filter_by(vendedor_id=user_id)
 
-        elif vista == 'revision':
-            # Esta es la bandeja de entrada del Gerente
-            query = query.filter(Order.estado == 'Pendiente Aprobacion')
-            # El vendedor solo ve las suyas para saber que están en cola
-            if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
+    # 5. OTROS FILTROS (Cliente Select, Fechas, Vendedor Dropdown)
+    
+    # Filtro Cliente (Select2)
+    filtro_cliente_ruc = request.args.get('filtro_cliente')
+    cliente_obj_filtro = None
+    if filtro_cliente_ruc:
+        cliente_obj_filtro = Client.query.filter_by(documento=filtro_cliente_ruc).first()
+        if cliente_obj_filtro:
+            query = query.filter(Order.cliente_id == cliente_obj_filtro.id)
 
-        elif vista == 'activos':
-            query = query.filter(Order.estado.in_(['Aprobado', 'Despachado']))
-            if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
-
-        elif vista == 'cerrados':
-            query = query.filter(Order.estado.in_(['Entregado', 'Anulado', 'Rechazado']))
-            if rol == 'vendedor': query = query.filter_by(vendedor_id=user_id)
-
-    # 4. Filtros Adicionales (Fechas, etc.)
+    # Filtro Fechas
     fecha_inicio = request.args.get('fecha_inicio')
     fecha_fin = request.args.get('fecha_fin')
     if fecha_inicio and fecha_fin:
@@ -2205,19 +2398,24 @@ def historial_ventas():
             query = query.filter(Order.fecha.between(start, end))
         except: pass
 
-    # Filtro Vendedor (Dropdown) - Solo funciona en vistas globales (Revision, Activos, Cerrados)
+    # Filtro Vendedor (Dropdown del Admin)
     filtro_vendedor = request.args.get('filtro_vendedor')
     if rol != 'vendedor' and filtro_vendedor and filtro_vendedor != 'todos':
-        # Si estás en 'borradores', este filtro no hará nada porque ya filtramos por user_id arriba
+        # Si estás en 'borradores', este filtro no servirá de mucho (porque ya filtramos por user_id),
+        # pero en 'activos' o 'historial' es muy útil.
         query = query.filter(Order.vendedor_id == filtro_vendedor)
 
-    # 5. Ejecución
+    # 6. EJECUCIÓN
     query = query.order_by(Order.fecha.desc())
+    
     page = request.args.get('page', 1, type=int)
     per_page = 20 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     ordenes = pagination.items 
     
+    # Cargamos clientes para el select (Al final para optimizar carga si falla algo antes)
+    clientes = Client.query.order_by(Client.nombre).limit(2000).all()
+
     return render_template('historial_ventas.html', 
                            ordenes=ordenes, 
                            pagination=pagination,
@@ -2225,7 +2423,7 @@ def historial_ventas():
                            cuentas=cuentas,
                            vendedores=vendedores,
                            clientes=clientes,
-                           cliente_filtro=cliente_obj_filtro,
+                           cliente_seleccionado=filtro_cliente_ruc, # Corrección de nombre variable para el template
                            hoy=datetime.now().date())
 
 
@@ -2451,7 +2649,8 @@ def obtener_detalle_venta(order_id):
                 'precio': d.precio_aplicado,
                 'subtotal': d.subtotal,
                 'tipo': d.item_type,
-                'componentes': comps_data # Enviamos la lista al HTML
+                'componentes': comps_data, # Enviamos la lista al HTML
+                'check_almacen': d.check_almacen
             })
 
         # 3. Datos Generales (Manejo de nulos con "or '-'")
@@ -2486,6 +2685,9 @@ def obtener_detalle_venta(order_id):
             'igv': orden.igv,
             'total': orden.total,
             'descuento_total': orden.descuento_total,
+            'chofer_nombre': orden.chofer.username if orden.chofer else None,
+            'peso_total': orden.peso_total,
+            'cantidad_bultos': orden.cantidad_bultos,
             
             'items': items_data
         }
@@ -2519,6 +2721,81 @@ def observar_cotizacion():
     db.session.commit()
     
     return {'status': 'success', 'msg': 'Cotización observada y devuelta.'}
+
+# =======================================================
+# MÓDULO DE ALMACÉN: PICKING LITE (SALIDAS)
+# =======================================================
+
+@app.route('/picking_almacen')
+def picking_almacen():
+    if session.get('role') not in ['admin', 'almacen']: 
+        return "Acceso denegado", 403
+    
+    # Solo traemos las cotizaciones que Gerencia ya aprobó
+    ordenes_pendientes = Order.query.filter_by(estado='Aprobado').order_by(Order.fecha.asc()).all()
+    
+    return render_template('picking_almacen.html', ordenes=ordenes_pendientes)
+
+@app.route('/api/procesar_salida_almacen/<int:order_id>', methods=['POST'])
+def procesar_salida_almacen(order_id):
+    if session.get('role') not in ['admin', 'almacen']: 
+        return {'status': 'error', 'msg': 'No autorizado'}, 403
+    
+    orden = Order.query.get_or_404(order_id)
+    
+    if orden.estado != 'Aprobado':
+        return {'status': 'error', 'msg': 'La cotización ya fue procesada o no está aprobada.'}
+        
+    try:
+        # 1. EJECUTAR DESCUENTOS DE KARDEX (Lo que antes hacía Gerencia)
+        for detalle in orden.details:
+            
+            # A. DESCUENTO PRODUCTO DIRECTO
+            if detalle.product_id and detalle.item_type == 'PRODUCTO':
+                prod = Product.query.get(detalle.product_id)
+                stock_anterior = prod.stock_actual
+                prod.stock_actual -= detalle.cantidad
+                
+                kardex = ProductMovement(
+                    product_id=prod.id,
+                    user_id=session['user_id'],
+                    tipo='SALIDA',
+                    cantidad=detalle.cantidad,
+                    stock_anterior=stock_anterior,
+                    stock_nuevo=prod.stock_actual,
+                    motivo=f"Salida de Almacén COT-{orden.id:05d} (Cliente: {orden.cliente.nombre[:15]}...)"
+                )
+                db.session.add(kardex)
+
+            # B. DESCUENTO COMPONENTES DE KIT (GLB)
+            elif detalle.item_type == 'GLB':
+                for comp in detalle.kit_components:
+                    prod_c = comp.product
+                    cantidad_total = comp.cantidad_requerida * detalle.cantidad
+                    
+                    stock_ant_c = prod_c.stock_actual
+                    prod_c.stock_actual -= cantidad_total
+                    
+                    kardex_c = ProductMovement(
+                        product_id=prod_c.id,
+                        user_id=session['user_id'],
+                        tipo='SALIDA',
+                        cantidad=cantidad_total,
+                        stock_anterior=stock_ant_c,
+                        stock_nuevo=prod_c.stock_actual,
+                        motivo=f"Salida Kit COT-{orden.id:05d} - {detalle.nombre_personalizado_titulo[:15]}..."
+                    )
+                    db.session.add(kardex_c)
+
+        # 2. CAMBIAR ESTADO A FINALIZADO
+        orden.estado = 'Entregado' # Usamos "Entregado" para que el Vendedor lo vea como cerrado en su historial
+        db.session.commit()
+        
+        return {'status': 'success', 'msg': 'Stock descontado correctamente en Kardex.'}
+        
+    except Exception as e:
+        db.session.rollback()
+        return {'status': 'error', 'msg': f'Error en el descargo: {str(e)}'}
 
 # --- ARRANQUE DE LA APLICACIÓN ---
 if __name__ == '__main__':

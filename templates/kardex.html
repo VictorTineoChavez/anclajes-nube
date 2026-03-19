@@ -60,37 +60,45 @@
                 <input type="date" name="fecha_fin" class="form-control form-control-sm" value="{{ request.args.get('fecha_fin', '') }}">
             </div>
 
-            <div class="col-md-2 d-grid gap-2 d-md-block text-end">
-                <button type="submit" class="btn btn-primary btn-sm px-3" title="Aplicar Filtros">
-                    <i class="bi bi-filter"></i>
-                </button>
-                <a href="{{ url_for('ver_kardex') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar Filtros">
-                    <i class="bi bi-x-lg"></i>
-                </a>
+            <div class="col-md-2 text-end">
+                <div class="form-check form-switch d-inline-block text-start mb-2 w-100 px-2 py-1 bg-white border rounded">
+                    <input class="form-check-input ms-0 me-2" type="checkbox" name="ocultar_iniciales" id="checkIniciales" 
+                           onchange="this.form.submit()" {% if request.args.get('ocultar_iniciales') == 'on' %}checked{% endif %}>
+                    <label class="form-check-label small text-muted fw-bold" for="checkIniciales" style="font-size: 0.7rem;">Ocultar Inicial</label>
+                </div>
+                
+                <div class="d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Aplicar Filtros">
+                        <i class="bi bi-filter"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('ver_kardex') }}" class="btn btn-outline-secondary btn-sm w-50" title="Limpiar Filtros">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body p-0 table-responsive">
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0 table-responsive" style="min-height: 400px;">
         <table class="table table-hover mb-0 align-middle small">
-            <thead class="table-dark text-nowrap">
+            <thead class="table-dark text-nowrap sticky-top">
                 <tr>
-                    <th>Fecha / Hora</th>
+                    <th class="ps-3">Fecha / Hora</th>
                     <th>Producto</th>
                     <th>Categoría</th>
                     <th class="text-center">Tipo</th>
                     <th>Motivo / Referencia</th>
                     <th>Usuario</th>
                     <th class="text-center">Cant.</th>
-                    <th class="text-center">Saldo Final</th>
+                    <th class="text-center pe-3">Saldo Final</th>
                 </tr>
             </thead>
             <tbody>
                 {% for m in movimientos %}
                 <tr>
-                    <td class="text-muted">{{ m.fecha.strftime('%d/%m/%y %H:%M') }}</td>
+                    <td class="text-muted ps-3">{{ m.fecha.strftime('%d/%m/%y %H:%M') }}</td>
                     
                     <td>
                         <strong class="d-block text-dark">{{ m.product.sku }}</strong>
@@ -119,7 +127,7 @@
                         {% if m.tipo == 'ENTRADA' %}+{% else %}-{% endif %}{{ m.cantidad }}
                     </td>
                     
-                    <td class="text-center bg-light fw-bold text-dark border-start">
+                    <td class="text-center bg-light fw-bold text-dark border-start pe-3">
                         {{ m.stock_nuevo }}
                     </td>
                 </tr>
@@ -134,5 +142,27 @@
             </tbody>
         </table>
     </div>
+
+    <div class="card-footer bg-white border-top py-3">
+        <nav aria-label="Navegación">
+            <ul class="pagination justify-content-center mb-0 pagination-sm">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('ver_kardex', page=pagination.prev_num, busqueda=request.args.get('busqueda',''), categoria=request.args.get('categoria','todas'), tipo=request.args.get('tipo',''), fecha_inicio=request.args.get('fecha_inicio',''), fecha_fin=request.args.get('fecha_fin','')) }}">Anterior</a>
+                </li>
+                
+                <li class="page-item disabled">
+                    <span class="page-link text-muted">
+                        Pág. <strong>{{ pagination.page }}</strong> de {{ pagination.pages }} 
+                        <span class="mx-1">|</span> Total: {{ pagination.total }} movs.
+                    </span>
+                </li>
+                
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('ver_kardex', page=pagination.next_num, busqueda=request.args.get('busqueda',''), categoria=request.args.get('categoria','todas'), tipo=request.args.get('tipo',''), fecha_inicio=request.args.get('fecha_inicio',''), fecha_fin=request.args.get('fecha_fin','')) }}">Siguiente</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
 </div>
 {% endblock %}

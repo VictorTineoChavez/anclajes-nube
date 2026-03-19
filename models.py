@@ -65,48 +65,74 @@ class Client(db.Model):
     last_updated = db.Column(db.DateTime, default=datetime.now)
     updated_by = db.Column(db.String(50), default='Sistema')
 
-# --- 6. ORDENES ---
+# EN MODELS.PY
+
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     fecha = db.Column(db.DateTime, default=datetime.now)
-    cliente_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    vendedor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    estado = db.Column(db.String(20), default='Pendiente')
     
+    # --- CLAVES FORÁNEAS ---
+    cliente_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    
+    # Aquí están los dos caminos a User:
+    vendedor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    chofer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True) # Nuevo
+    
+    # --- ESTADOS Y DATOS GENERALES ---
+    estado = db.Column(db.String(20), default='Pendiente')
     atencion = db.Column(db.String(100)) 
-    orden_compra = db.Column(db.String(50)) 
+    orden_compra = db.Column(db.String(50)) # O/C del Cliente (Texto manual)
+    archivo_oc = db.Column(db.String(255))  # Nombre del archivo PDF (OC_xxx.pdf)
 
-    # Nuevos campos Cotización
+    # --- DATOS DE COTIZACIÓN ---
     condicion_pago = db.Column(db.String(50))
     validez_oferta = db.Column(db.String(50))
     plazo_entrega_texto = db.Column(db.String(100))
-    observacion = db.Column(db.Text)
+    observacion = db.Column(db.Text) # Nota del Vendedor (Logística)
+    motivo_rechazo = db.Column(db.Text) # Nota del Gerente (Rechazo)
 
+    # --- DATOS MONETARIOS ---
     moneda = db.Column(db.String(5), default='PEN') 
     tipo_cambio = db.Column(db.Float, default=1.0)  
-    
     subtotal = db.Column(db.Float, default=0.0)
     igv = db.Column(db.Float, default=0.0)
     total = db.Column(db.Float, default=0.0)
     
+    # --- DESCUENTOS ---
+    descuento_tipo = db.Column(db.String(10), default='MONTO') 
+    descuento_valor = db.Column(db.Float, default=0.0)         
+    descuento_total = db.Column(db.Float, default=0.0)         
+
+    # --- DATOS DE ENTREGA / LOGÍSTICA ---
     tipo_entrega = db.Column(db.String(20)) 
     direccion_envio = db.Column(db.String(200))
     fecha_entrega = db.Column(db.Date)
     
+    # Datos de Almacén (Nuevos)
+    peso_total = db.Column(db.String(50))      
+    cantidad_bultos = db.Column(db.String(50)) 
+    
+    # --- ESTADO DE PAGO ---
     monto_pagado = db.Column(db.Float, default=0.0)
     estado_pago = db.Column(db.String(20), default='Pendiente') 
     
-    cliente = db.relationship('Client', backref='orders')
-    vendedor = db.relationship('User', backref='orders')
-
-    descuento_tipo = db.Column(db.String(10), default='MONTO') # 'PORCENTAJE' o 'MONTO'
-    descuento_valor = db.Column(db.Float, default=0.0)         # El número ingresado (ej. 5 o 100)
-    descuento_total = db.Column(db.Float, default=0.0)         # El dinero real descontado   
-
-    observacion = db.Column(db.Text) # Esta es la del Vendedor (Logística)
+    # --- RELACIONES (AQUÍ ESTÁ LA CORRECCIÓN DEL ERROR) ---
     
-    # --- AGREGAR ESTA LÍNEA NUEVA ---
-    motivo_rechazo = db.Column(db.Text) # Esta es EXCLUSIVA para el Gerente
+    cliente = db.relationship('Client', backref='orders')
+    
+    # 1. Relación VENDEDOR: Especificamos explícitamente que use 'vendedor_id'
+    vendedor = db.relationship('User', 
+                               foreign_keys=[vendedor_id], 
+                               backref='ventas_realizadas') # Cambié el backref para ser más claro
+
+    # 2. Relación CHOFER: Especificamos explícitamente que use 'chofer_id'
+    chofer = db.relationship('User', 
+                             foreign_keys=[chofer_id], 
+                             backref='envios_asignados')
+    
+    # Relación con detalles (Items)
+    # details = db.relationship('OrderDetail', backref='order', cascade="all, delete-orphan") 
+    # (Asumo que esta línea la tienes en tu código original o en OrderDetail, si no, agrégala)
 
 # --- 7. DETALLE DE ORDEN (Aquí estaba el problema) ---
 class OrderDetail(db.Model):
@@ -118,7 +144,6 @@ class OrderDetail(db.Model):
     
     # Nuevos campos para manejar tipos
     item_type = db.Column(db.String(20), default='PRODUCTO') # PRODUCTO, FABRICACION, GLB
-    nombre_personalizado = db.Column(db.String(200)) 
     
     cantidad = db.Column(db.Integer, nullable=False)
     precio_aplicado = db.Column(db.Float, nullable=False)
@@ -137,6 +162,7 @@ class OrderDetail(db.Model):
     
     # NUEVO CAMPO:
     nombre_personalizado_titulo = db.Column(db.String(200)) # Este guardará la parte en NEGRITA
+    check_almacen = db.Column(db.Boolean, default=False)
 
 # --- 8. COMPONENTES DE KIT (GLB) ---
 class OrderKitComponent(db.Model):

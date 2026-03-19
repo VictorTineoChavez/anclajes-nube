@@ -1,191 +1,214 @@
 {% extends "base.html" %}
 
 {% block title %}Gestión de Usuarios{% endblock %}
-{% block subtitle %}Administración de accesos y perfiles del personal{% endblock %}
+{% block subtitle %}Directorio y Control de Accesos{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-end mb-4">
-    <button class="btn btn-primary" onclick="abrirModalCrear()">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="input-group w-50 shadow-sm">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" id="filtroTabla" class="form-control border-start-0" placeholder="Buscar por nombre o usuario..." onkeyup="filtrarTabla()">
+    </div>
+
+    <button class="btn btn-primary shadow-sm fw-bold px-4" onclick="abrirModalCrear()">
         <i class="bi bi-person-plus-fill me-2"></i> Nuevo Usuario
     </button>
 </div>
 
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
     <div class="card-header bg-white py-3 border-0">
-        <h6 class="mb-0 fw-bold text-muted text-uppercase small ls-1">Directorio de Personal</h6>
+        <h6 class="mb-0 fw-bold text-muted text-uppercase small ls-1">Personal Registrado</h6>
     </div>
     
     <div class="table-responsive">
-        <table class="table align-middle table-hover mb-0">
+        <table class="table align-middle table-hover mb-0" id="tablaUsuarios">
             <thead class="bg-light">
                 <tr>
-                    <th class="ps-4 text-uppercase text-muted small fw-bold" style="width: 50px;">ID</th>
-                    <th class="text-uppercase text-muted small fw-bold">Usuario / Nombre</th>
-                    <th class="text-uppercase text-muted small fw-bold">Rol Asignado</th>
-                    <th class="text-uppercase text-muted small fw-bold text-center">Estado</th>
+                    <th class="ps-4 text-uppercase text-muted small fw-bold">Perfil</th>
+                    <th class="text-uppercase text-muted small fw-bold">Rol / Cargo</th>
+                    <th class="text-uppercase text-muted small fw-bold">Contacto</th>
                     <th class="text-end pe-4 text-uppercase text-muted small fw-bold">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in usuarios %}
                 <tr>
-                    <td class="ps-4 text-muted">#{{ u.id }}</td>
-                    
-                    <td>
+                    <td class="ps-4">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold" 
-                                 style="width: 40px; height: 40px; font-size: 1rem;">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" 
+                                 style="width: 42px; height: 42px; font-size: 1.1rem; background-color: {{ 'var(--bs-primary)' if u.role == 'admin' else '#6c757d' }};">
                                 {{ u.username[0]|upper }}
                             </div>
                             <div class="d-flex flex-column">
                                 <span class="fw-bold text-dark">{{ u.nombre_completo }}</span>
-                                <small class="text-muted">@{{ u.username }}</small>
+                                <div class="d-flex align-items-center">
+                                    <small class="text-muted me-1">@{{ u.username }}</small>
+                                    {% if u.role == 'admin' %}
+                                    <i class="bi bi-shield-fill-check text-primary" style="font-size: 0.75rem;" title="Super Admin"></i>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                     </td>
 
                     <td>
                         {% if u.role == 'admin' %}
-                            <span class="badge badge-soft badge-dark">
-                                <i class="bi bi-shield-lock-fill me-1"></i> Gerencia
-                            </span>
+                            <span class="badge bg-dark mb-1"><i class="bi bi-shield-lock-fill"></i> Gerencia</span>
                         {% elif u.role == 'administracion' %}
-                            <span class="badge badge-soft badge-warning">
-                                <i class="bi bi-graph-up me-1"></i> Administración
-                            </span>
+                            <span class="badge bg-warning text-dark mb-1"><i class="bi bi-graph-up"></i> Admin</span>
                         {% elif u.role == 'vendedor' %}
-                            <span class="badge badge-soft badge-success">
-                                <i class="bi bi-shop me-1"></i> Ventas
-                            </span>
+                            <span class="badge bg-success mb-1"><i class="bi bi-shop"></i> Ventas</span>
                         {% elif u.role == 'almacen' %}
-                            <span class="badge badge-soft badge-info">
-                                <i class="bi bi-box-seam me-1"></i> Almacén
-                            </span>
+                            <span class="badge bg-info text-dark mb-1"><i class="bi bi-box-seam"></i> Almacén</span>
+                        {% elif u.role == 'chofer' %}
+                            <span class="badge bg-secondary mb-1"><i class="bi bi-truck"></i> Chofer</span>
                         {% endif %}
+                        
+                        <div class="small text-muted" style="font-size: 0.75rem;">
+                            {{ u.cargo_formal or 'Sin cargo definido' }}
+                        </div>
                     </td>
 
-                    <td class="text-center">
-                        <span class="badge border border-success text-success bg-transparent rounded-pill">
-                            <i class="bi bi-dot"></i> Activo
-                        </span>
+                    <td>
+                        {% if u.celular %}
+                            <div class="text-nowrap mb-1"><i class="bi bi-whatsapp text-success"></i> {{ u.celular }}</div>
+                        {% else %}
+                            <div class="text-muted small mb-1">--</div>
+                        {% endif %}
+                        
+                        {% if u.email_empresa %}
+                            <div class="text-muted small text-truncate" style="max-width: 150px;" title="{{u.email_empresa}}">
+                                <i class="bi bi-envelope"></i> {{ u.email_empresa }}
+                            </div>
+                        {% endif %}
                     </td>
 
                     <td class="text-end pe-4">
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-light border text-muted" 
+                            <button class="btn btn-sm btn-light border text-primary" 
                                     onclick="abrirModalEditar('{{u.id}}', '{{u.nombre_completo}}', '{{u.username}}', '{{u.role}}', '{{u.celular}}','{{u.cargo_formal}}', '{{u.email_empresa}}')"
-                                    title="Editar">
+                                    title="Editar Perfil">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
                             
                             {% if u.id != session.get('user_id') %}
                             <a href="{{ url_for('eliminar_usuario', user_id=u.id) }}" 
                                class="btn btn-sm btn-light border text-danger hover-danger"
-                               onclick="return confirm('⚠️ ¿Está seguro de ELIMINAR a este usuario? Esta acción es irreversible.');"
-                               title="Eliminar Cuenta">
+                               onclick="return confirm('⛔ PRECAUCIÓN:\n\n¿Está seguro de ELIMINAR al usuario @{{u.username}}?\n\nEsta acción borrará su acceso, pero mantendrá su historial de ventas/kardex por seguridad.');"
+                               title="Eliminar Acceso">
                                 <i class="bi bi-trash"></i>
                             </a>
                             {% else %}
-                            <button class="btn btn-sm btn-light border" disabled title="Usuario Actual">
-                                <i class="bi bi-lock"></i>
+                            <button class="btn btn-sm btn-light border text-muted" disabled title="No puedes borrar tu propia cuenta activa">
+                                <i class="bi bi-lock-fill"></i>
                             </button>
                             {% endif %}
                         </div>
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="5" class="text-center py-5">
-                        <div class="d-flex flex-column align-items-center justify-content-center text-muted">
-                            <i class="bi bi-people display-4 opacity-25 mb-2"></i>
-                            <p class="mb-0">No se encontraron usuarios registrados.</p>
-                        </div>
-                    </td>
-                </tr>
+                <tr><td colspan="4" class="text-center py-5 text-muted">No se encontraron usuarios.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<div class="modal fade" id="modalUsuario" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalUsuario" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="{{ url_for('guardar_usuario') }}" method="POST">
+            <form action="{{ url_for('guardar_usuario') }}" method="POST" autocomplete="off">
                 <input type="hidden" name="user_id" id="userId">
+                <input type="hidden" name="nombre_completo" id="hiddenNombreCompleto">
                 
-                <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
+                <div class="modal-header bg-primary text-white border-bottom-0 pt-4 px-4">
                     <div>
-                        <h5 class="modal-title fw-bold" id="modalTitulo">Nuevo Usuario</h5>
-                        <p class="text-muted small mb-0">Complete la información para registrar el acceso.</p>
+                        <h5 class="modal-title fw-bold" id="modalTitulo">Usuario</h5>
+                        <p class="mb-0 small text-white-50">Gestión de credenciales y permisos</p>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
                 <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Nombre Completo</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-person-vcard"></i></span>
-                            <input type="text" name="nombre_completo" id="inputNombre" class="form-control bg-light border-start-0" placeholder="Ej: Juan Pérez" required>
+                    
+                    <h6 class="text-primary fw-bold small text-uppercase border-bottom pb-2 mb-3">
+                        <i class="bi bi-person-vcard me-1"></i> Datos Personales
+                    </h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Nombres <span class="text-danger">*</span></label>
+                            <input type="text" name="nombres" id="inputNombres" class="form-control bg-light" required>
                         </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Usuario (Login)</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-person"></i></span>
-                            <input type="text" name="username" id="inputUser" class="form-control bg-light border-start-0" placeholder="Ej: jperez" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Celular (Para Cotizaciones)</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-phone"></i></span>
-                            <input type="text" name="celular" id="inputCelular" class="form-control bg-light border-start-0" placeholder="Ej: 999 888 777">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Apellidos <span class="text-danger">*</span></label>
+                            <input type="text" name="apellidos" id="inputApellidos" class="form-control bg-light" required>
                         </div>
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-bold text-muted">Cargo (Doc)</label>
-                            <input type="text" name="cargo_formal" id="inputCargo" class="form-control bg-light" placeholder="Ej: Asesor Comercial">
+                            <label class="form-label small fw-bold text-muted">Celular</label>
+                            <input type="tel" name="celular" id="inputCelular" class="form-control" 
+                                   placeholder="999..." pattern="9[0-9]{8}" maxlength="9" 
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-bold text-muted">Email Empresa</label>
-                            <input type="email" name="email_empresa" id="inputEmail" class="form-control bg-light" placeholder="juan@empresa.com">
+                            <label class="form-label small fw-bold text-muted">Cargo</label>
+                            <input type="text" name="cargo_formal" id="inputCargo" class="form-control" placeholder="Ej: Vendedor Sr.">
                         </div>
                     </div>
 
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted text-uppercase">Rol / Permisos</label>
-                            <select name="role" id="selectRol" class="form-select bg-light" required>
-                                <option value="vendedor">Vendedor</option>
-                                <option value="almacen">Almacén</option>
-                                <option value="administracion">Administración</option>
-                                <option value="admin">Gerencia Total</option>
-                            </select>
+                    <h6 class="text-primary fw-bold small text-uppercase border-bottom pb-2 mb-3 mt-4">
+                        <i class="bi bi-shield-lock me-1"></i> Accesos y Seguridad
+                    </h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Rol en Sistema</label>
+                        <select name="role" id="selectRol" class="form-select border-primary" required>
+                            <option value="" disabled selected>-- Seleccionar Rol --</option>
+                            <option value="vendedor">Vendedor</option>
+                            <option value="almacen">Jefe de Almacén</option>
+                            <option value="chofer">Chofer / Transportista</option>
+                            <option value="administracion">Administración</option>
+                            <option value="admin">Gerencia Total (Admin)</option>
+                        </select>
+                        <div id="adminWarning" class="form-text text-warning d-none">
+                            <i class="bi bi-exclamation-triangle"></i> Cuidado: Está editando sus propios permisos.
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted text-uppercase">Contraseña</label>
-                            <input type="text" name="password" class="form-control bg-light" placeholder="Nueva clave...">
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Usuario (Login)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted">@</span>
+                                <input type="text" name="username" id="inputUser" class="form-control fw-bold" required>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Contraseña</label>
+                            <div class="input-group">
+                                <input type="password" name="password" id="inputPass" class="form-control border-end-0" placeholder="Nueva clave...">
+                                <button class="btn btn-outline-secondary border-start-0 bg-white text-muted" type="button" onclick="togglePassword()">
+                                    <i class="bi bi-eye" id="iconEye"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="alert alert-light border d-flex align-items-start gap-2 mb-0">
-                        <i class="bi bi-info-circle-fill text-info mt-1"></i>
-                        <small class="text-muted" id="textPassInfo">
-                            Para usuarios nuevos, la contraseña es obligatoria. Al editar, déjela vacía para mantener la actual.
+                    <div class="alert alert-light border mt-3 mb-0 p-2 d-flex gap-2 align-items-center">
+                        <i class="bi bi-info-circle-fill text-info"></i>
+                        <small class="text-muted lh-sm" id="msgPassword">
+                            * Obligatoria para nuevos usuarios.
                         </small>
                     </div>
+
                 </div>
 
-                <div class="modal-footer border-top-0 px-4 pb-4 pt-0">
+                <div class="modal-footer border-top-0 px-4 pb-4">
                     <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary fw-bold px-4" id="btnGuardar">
-                        <i class="bi bi-check-lg me-1"></i> Guardar Usuario
+                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                        <i class="bi bi-check-lg me-1"></i> Guardar
                     </button>
                 </div>
             </form>
@@ -194,39 +217,102 @@
 </div>
 
 <script>
-    // Lógica del Modal (Sin cambios funcionales, solo textos)
+    // 1. FUNCIÓN PARA VER LA CONTRASEÑA (TOGGLE)
+    function togglePassword() {
+        const input = document.getElementById('inputPass');
+        const icon = document.getElementById('iconEye');
+        
+        if (input.type === "password") {
+            input.type = "text";
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = "password";
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    }
+
+    // 2. FILTRO DE TABLA RÁPIDO
+    function filtrarTabla() {
+        const input = document.getElementById("filtroTabla");
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById("tablaUsuarios");
+        const tr = table.getElementsByTagName("tr");
+
+        for (let i = 1; i < tr.length; i++) { // Empezar en 1 para saltar header
+            let visible = false;
+            // Buscar en todas las columnas
+            const td = tr[i].getElementsByTagName("td");
+            for(let j=0; j<td.length; j++){
+                if (td[j]) {
+                    if (td[j].textContent.toUpperCase().indexOf(filter) > -1) {
+                        visible = true;
+                    }
+                }
+            }
+            tr[i].style.display = visible ? "" : "none";
+        }
+    }
+
     function abrirModalCrear() {
         document.getElementById('userId').value = ""; 
-        document.getElementById('inputNombre').value = "";
-        document.getElementById('inputUser').value = "";
-        document.getElementById('selectRol').value = "vendedor";
+        document.getElementById('hiddenNombreCompleto').value = "";
         
-        // Limpiar campos nuevos
+        document.getElementById('inputNombres').value = "";
+        document.getElementById('inputApellidos').value = "";
+        document.getElementById('inputUser').value = "";
+        
+        document.getElementById('inputPass').value = ""; 
+        document.getElementById('inputPass').required = true; // OBLIGATORIO al crear
+        
+        document.getElementById('inputCelular').value = "";
         document.getElementById('inputCargo').value = "";
-        document.getElementById('inputEmail').value = "";
+        document.getElementById('selectRol').value = "";
         
         document.getElementById('modalTitulo').innerText = "Crear Nuevo Usuario";
-        document.getElementById('btnGuardar').innerHTML = '<i class="bi bi-plus-lg me-1"></i> Crear Usuario';
-        
+        document.getElementById('msgPassword').innerText = "Al crear, defina una contraseña inicial. El usuario podrá cambiarla si lo solicita.";
+        document.getElementById('adminWarning').classList.add('d-none');
+
         new bootstrap.Modal(document.getElementById('modalUsuario')).show();
     }
 
-    function abrirModalEditar(id, nombre, user, rol, celular, cargo, email) {
+    function abrirModalEditar(id, nombreCompleto, user, rol, celular, cargo, email) {
         document.getElementById('userId').value = id;
-        document.getElementById('inputNombre').value = nombre;
+        document.getElementById('hiddenNombreCompleto').value = nombreCompleto;
+        
+        // Separación inteligente de Nombre/Apellido
+        let partes = nombreCompleto.split(" ");
+        if (partes.length > 2) {
+            document.getElementById('inputNombres').value = partes.slice(0, 2).join(" ");
+            document.getElementById('inputApellidos').value = partes.slice(2).join(" ");
+        } else if (partes.length === 2) {
+            document.getElementById('inputNombres').value = partes[0];
+            document.getElementById('inputApellidos').value = partes[1];
+        } else {
+            document.getElementById('inputNombres').value = nombreCompleto;
+            document.getElementById('inputApellidos').value = "";
+        }
+
         document.getElementById('inputUser').value = user;
         document.getElementById('selectRol').value = rol;
-        
-        // Asigna el celular
         document.getElementById('inputCelular').value = (celular && celular != 'None') ? celular : '';
-        
-        // Asigna Cargo y Email (Corrección)
         document.getElementById('inputCargo').value = (cargo && cargo != 'None') ? cargo : '';
-        document.getElementById('inputEmail').value = (email && email != 'None') ? email : '';
         
-        document.getElementById('modalTitulo').innerText = "Editar Perfil";
-        document.getElementById('btnGuardar').innerHTML = '<i class="bi bi-save me-1"></i> Guardar Cambios';
+        document.getElementById('inputPass').value = "";
+        document.getElementById('inputPass').required = false; // OPCIONAL al editar
         
+        document.getElementById('modalTitulo').innerText = "Editar Usuario: " + user;
+        document.getElementById('msgPassword').innerText = "Deje el campo vacío para MANTENER la contraseña actual. Escriba solo si desea cambiarla.";
+        
+        // Alerta si me edito a mi mismo
+        const miId = "{{ session.get('user_id') }}";
+        if(id == miId) {
+            document.getElementById('adminWarning').classList.remove('d-none');
+        } else {
+            document.getElementById('adminWarning').classList.add('d-none');
+        }
+
         new bootstrap.Modal(document.getElementById('modalUsuario')).show();
     }
 </script>

@@ -50,44 +50,48 @@
                 <a href="{{ url_for('ver_kardex') }}" class="nav-link {{ 'active' if request.endpoint == 'ver_kardex' }}">
                     <i class="bi bi-clock-history"></i> <span class="ms-2">Kardex</span>
                 </a>
-                <a href="{{ url_for('despachos') }}" class="nav-link {{ 'active' if request.endpoint == 'despachos' }}">
-                    <i class="bi bi-truck"></i> <span class="ms-2">Despachos</span>
+                <a href="{{ url_for('picking_almacen') }}" class="nav-link {{ 'active' if request.endpoint == 'picking_almacen' }}">
+                    <i class="bi bi-box-arrow-up-right"></i> <span class="ms-2">Salidas (Picking)</span>
                 </a>
                 {% endif %}
 
-                {% if session.get('role') in ['admin', 'administracion'] %}
-                <div class="nav-title">Gestión</div>
-                <a href="{{ url_for('cobranzas') }}" class="nav-link {{ 'active' if request.endpoint == 'cobranzas' }}">
-                    <i class="bi bi-wallet2"></i> <span class="ms-2">Cobranzas</span>
-                </a>
-                <a href="{{ url_for('reportes_predicciones') }}" class="nav-link {{ 'active' if request.endpoint == 'reportes_predicciones' }}">
-                    <i class="bi bi-graph-up-arrow"></i> <span class="ms-2">BI & Predicciones</span>
-                </a>
-                {% endif %}
-                
                 {% if session.get('role') == 'admin' %}
                 <div class="nav-title">Sistema</div>
                 <a href="{{ url_for('gestion_usuarios') }}" class="nav-link {{ 'active' if request.endpoint == 'gestion_usuarios' }}">
                     <i class="bi bi-people"></i> <span class="ms-2">Usuarios</span>
                 </a>
                 {% endif %}
+                
             </div>
         </div>
 
         <div class="border-top border-secondary border-opacity-25 p-3">
-            <div class="d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center gap-2 overflow-hidden">
-                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0" style="width: 32px; height: 32px;">
-                        {{ session.get('username')[0]|upper }}
+            <div class="dropup">
+                <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle text-white" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0 border border-secondary" style="width: 32px; height: 32px;">
+                        {{ session.get('nombre')[0]|upper }}
                     </div>
-                    <div class="user-info-text overflow-hidden">
-                        <div class="text-white fw-medium text-truncate small">{{ session.get('username') }}</div>
+                    <div class="ms-2 user-info-text overflow-hidden flex-grow-1">
+                        <div class="text-white fw-medium text-truncate small">{{ session.get('nombre') }}</div>
                         <div class="text-white-50 small text-uppercase" style="font-size: 0.65rem;">{{ session.get('role') }}</div>
                     </div>
-                </div>
-                <a href="{{ url_for('logout') }}" class="text-white-50 hover-white" title="Salir">
-                    <i class="bi bi-box-arrow-right"></i>
+                    <i class="bi bi-chevron-up text-white-50 small ms-2"></i>
                 </a>
+                
+                <ul class="dropdown-menu dropdown-menu-dark shadow-lg mb-2" aria-labelledby="dropdownUser1">
+                    <li><h6 class="dropdown-header text-uppercase small opacity-50">Mi Cuenta</h6></li>
+                    <li>
+                        <a class="dropdown-item py-2" href="{{ url_for('perfil_usuario') }}">
+                            <i class="bi bi-person-gear me-2 text-info"></i> Mi Perfil
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+                    <li>
+                        <a class="dropdown-item py-2 text-danger" href="{{ url_for('logout') }}">
+                            <i class="bi bi-box-arrow-right me-2"></i> Cerrar Sesión
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
