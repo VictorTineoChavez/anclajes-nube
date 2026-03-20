@@ -1,5 +1,10 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import pytz
+
+
+def hora_peru():
+    return datetime.now(pytz.timezone('America/Lima'))
 
 db = SQLAlchemy()
 
@@ -41,7 +46,7 @@ class Product(db.Model):
 # --- 4. KARDEX ---
 class ProductMovement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    fecha = db.Column(db.DateTime, default=hora_peru)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     tipo = db.Column(db.String(10)) 
@@ -62,14 +67,14 @@ class Client(db.Model):
     direccion = db.Column(db.String(200))
     estado = db.Column(db.String(50), default='ACTIVO')      
     condicion = db.Column(db.String(50), default='HABIDO')   
-    last_updated = db.Column(db.DateTime, default=datetime.now)
+    last_updated = db.Column(db.DateTime, default=hora_peru)
     updated_by = db.Column(db.String(50), default='Sistema')
 
 # EN MODELS.PY
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    fecha = db.Column(db.DateTime, default=hora_peru)
     
     # --- CLAVES FORÁNEAS ---
     cliente_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
@@ -175,7 +180,7 @@ class OrderKitComponent(db.Model):
 
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    fecha = db.Column(db.DateTime, default=hora_peru)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     monto = db.Column(db.Float, nullable=False)
     metodo = db.Column(db.String(50))
@@ -186,14 +191,14 @@ class Payment(db.Model):
 class SystemConfig(db.Model):
     key = db.Column(db.String(50), primary_key=True)
     value = db.Column(db.String(255))               
-    updated_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=hora_peru)
     updated_by = db.Column(db.String(50), default='Sistema')
 
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     accion = db.Column(db.String(255), nullable=False)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    fecha = db.Column(db.DateTime, default=hora_peru)
     icono = db.Column(db.String(50), default='bi-info-circle')
     color = db.Column(db.String(20), default='text-primary')
     

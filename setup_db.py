@@ -34,7 +34,7 @@ with app.app_context():
         password='123', 
         nombre_completo='Pedro Castillo (Almacén)', 
         role='almacen'
-    )
+    )   
     
     db.session.add_all([admin, jefe_ventas, vendedor, almacen])
     

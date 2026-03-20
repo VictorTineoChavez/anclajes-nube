@@ -21,7 +21,12 @@ import os
 import io
 import requests
 import re
+import pytz
 
+
+
+def hora_peru():
+    return datetime.now(pytz.timezone('America/Lima'))
 # --- FUNCIÓN AUXILIAR PARA GUARDAR HISTORIAL ---
 def registrar_log(accion, icono='bi-info-circle', color='text-primary'):
     if 'user_id' in session:
@@ -63,7 +68,7 @@ def index():
     
     rol = session.get('role')
     user_id = session.get('user_id')
-    hoy = datetime.now().date()
+    hoy = hora_peru().date()
     
     # --- DATOS COMUNES (Alertas de Stock) ---
     UMBRAL_STOCK = 100 
@@ -169,7 +174,7 @@ def consulta_documento():
     # --- CANDADO DE SEGURIDAD (AHORRO DE DINERO) ---
     if cliente_db and force:
         # Calculamos el tiempo transcurrido
-        tiempo_pasado = datetime.now() - cliente_db.last_updated
+        tiempo_pasado = hora_peru() - cliente_db.last_updated
         total_segundos = tiempo_pasado.total_seconds()
         horas_pasadas = total_segundos / 3600
         
@@ -248,7 +253,7 @@ def consulta_documento():
                 cliente_db = Client(
                     documento=numero, nombre=razon, direccion=direccion,
                     estado=estado, condicion=condicion,
-                    last_updated=datetime.now(),
+                    last_updated=hora_peru(),
                     updated_by=usuario_actual
                 )
                 db.session.add(cliente_db)
@@ -257,7 +262,7 @@ def consulta_documento():
                 cliente_db.direccion = direccion
                 cliente_db.estado = estado
                 cliente_db.condicion = condicion
-                cliente_db.last_updated = datetime.now()
+                cliente_db.last_updated = hora_peru()
                 cliente_db.updated_by = usuario_actual
             
             db.session.commit()
@@ -269,7 +274,7 @@ def consulta_documento():
                 'direccion': direccion,
                 'estado': estado,
                 'condicion': condicion,
-                'last_updated': datetime.now().strftime('%d/%m %H:%M'),
+                'last_updated': hora_peru().strftime('%d/%m %H:%M'),
                 'updated_by': usuario_actual
             }
         else:
@@ -311,7 +316,7 @@ def obtener_tipo_cambio(usuario_solicitante="Sistema", forzar=False):
         pass
 
     # Usamos la hora del sistema (Tu PC) para evitar líos de zona horaria
-    ahora = datetime.now() 
+    ahora = hora_peru() 
     hoy = ahora.date()
 
     # DEFINIR HORA DE CORTE SUNAT: 08:30 AM de hoy
@@ -431,7 +436,7 @@ def descargar_reporte_excel():
         func.sum(ProductMovement.cantidad).label('total_vendido')
     ).join(ProductMovement).filter(
         ProductMovement.tipo == 'SALIDA',
-        ProductMovement.fecha >= datetime.now() - timedelta(days=90)
+        ProductMovement.fecha >= hora_peru() - timedelta(days=90)
     ).group_by(Product.id).all()
     
     data_excel = []
@@ -568,7 +573,7 @@ def exportar_excel():
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name=f'Inventario_ImportBolts_{datetime.now().strftime("%Y%m%d")}.xlsx'
+        download_name=f'Inventario_ImportBolts_{hora_peru().strftime("%Y%m%d")}.xlsx'
     )
 
 # --- NUEVA RUTA: DESCARGAR PLANTILLA VACÍA ---
@@ -988,7 +993,7 @@ def nueva_venta():
                     nombre=data.get('cliente_nombre'),
                     telefono=data.get('cliente_tel'),
                     direccion=data.get('cliente_dir'),
-                    estado='ACTIVO', condicion='HABIDO', last_updated=datetime.now()
+                    estado='ACTIVO', condicion='HABIDO', last_updated=hora_peru()
                 )
                 db.session.add(cliente)
             else:
@@ -1013,7 +1018,7 @@ def nueva_venta():
                 if nums: dias_validez = int(nums[0])
             except:
                 pass
-            fecha_vencimiento_calc = datetime.now().date() + timedelta(days=dias_validez)
+            fecha_vencimiento_calc = hora_peru().date() + timedelta(days=dias_validez)
 
             tipo_entrega = data['tipo_entrega']
             dir_entrega_final = data['direccion_entrega']
@@ -1073,7 +1078,7 @@ def nueva_venta():
             nueva_orden = Order(
                 cliente_id=cliente.id, 
                 vendedor_id=session['user_id'], 
-                fecha=datetime.now(),
+                fecha=hora_peru(),
                 
                 # USAMOS LOS VALORES CALCULADOS EN BACKEND
                 subtotal=subtotal_neto_final,
@@ -1972,7 +1977,7 @@ def despachos():
                            orden_actual=modo_orden,
                            c_pend=count_pend,
                            c_proc=count_proc,
-                           hoy=datetime.now().date(),
+                           hoy=hora_peru().date(),
                            choferes=choferes) # <--- 🔴 IMPORTANTE: ENVIARLOS AQUI
 
 # --- EN APP.PY ---
@@ -2045,7 +2050,7 @@ def registrar_pago():
         monto=monto,
         metodo=metodo,
         nota=nota,
-        fecha=datetime.now()
+        fecha=hora_peru()
     )
     db.session.add(nuevo_pago)
     
@@ -2110,7 +2115,7 @@ def reportes_predicciones():
     ).join(ProductMovement).filter(
         ProductMovement.tipo == 'SALIDA',
         # Analizamos los últimos 90 días (Trimestre) para mejor precisión
-        ProductMovement.fecha >= datetime.now() - timedelta(days=90)
+        ProductMovement.fecha >= hora_peru() - timedelta(days=90)
     ).group_by(Product.id).all()
     
     reporte = []
@@ -2139,7 +2144,7 @@ def reportes_predicciones():
     # Ordenar por los que más se van a vender
     reporte = sorted(reporte, key=lambda k: k['prediccion_prox_mes'], reverse=True)
     
-    return render_template('reportes_predicciones.html', data=reporte, hoy=datetime.now())
+    return render_template('reportes_predicciones.html', data=reporte, hoy=hora_peru())
 
 # --- EN APP.PY ---
 
@@ -2298,7 +2303,7 @@ def aprobar_cotizacion_gerencia(order_id):
 
         # 2. CAMBIO DE ESTADO (El stock NO se toca aquí)
         orden.estado = 'Aprobado' 
-        orden.fecha_aprobacion = datetime.now() 
+        orden.fecha_aprobacion = hora_peru() 
         
         db.session.commit()
         
@@ -2424,7 +2429,7 @@ def historial_ventas():
                            vendedores=vendedores,
                            clientes=clientes,
                            cliente_seleccionado=filtro_cliente_ruc, # Corrección de nombre variable para el template
-                           hoy=datetime.now().date())
+                           hoy=hora_peru().date())
 
 
 # --- RUTA PARA CARGAR LA EDICIÓN (GET) ---
