@@ -640,7 +640,62 @@
     let modoActual = 'PRODUCTO'; 
     let glbTempData = null; 
     let componentesGLB = []; 
-    let monedaAnterior = 'USD'; // Variable para recordar estado anterior si cancela
+    let monedaAnterior = 'USD'; // Variable para recordar estado anterior si cancela}
+
+
+    window.aplicarDescuentoItem = function(index) {
+        let item = carrito[index];
+        let moneda = $('#selectMoneda').val();
+        let simbolo = moneda === 'PEN' ? 'S/' : '$';
+
+        Swal.fire({
+            title: 'Descuento Especial',
+            html: `
+                <div class="text-start small text-muted mb-2">${item.nombre}</div>
+                <select id="swal-desc-tipo" class="form-select mb-2">
+                    <option value="%">Porcentaje (%)</option>
+                    <option value="MONTO">Monto Directo (${simbolo})</option>
+                </select>
+                <input id="swal-desc-valor" type="number" class="form-control" placeholder="Ej: 10" min="0" step="any">
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Aplicar',
+            cancelButtonText: 'Quitar Descuento',
+            confirmButtonColor: '#198754',
+        }).then(res => {
+            let tc = parseFloat($('#inputTC').val()) || 1;
+            let precioRealSinDesc = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
+
+            if (res.isConfirmed) {
+                let tipo = document.getElementById('swal-desc-tipo').value;
+                let valor = parseFloat(document.getElementById('swal-desc-valor').value) || 0;
+
+                if (valor > 0) {
+                    item.desc_tipo = tipo;
+                    item.desc_valor = valor;
+
+                    if (tipo === '%') {
+                        item.precio = precioRealSinDesc * (1 - (valor / 100));
+                        item.desc_label = `Descuento: -${valor}%`;
+                    } else {
+                        item.precio = precioRealSinDesc - valor;
+                        if (item.precio < 0) item.precio = 0;
+                        item.desc_label = `Descuento: -${simbolo}${valor}`;
+                    }
+                }
+            } else if (res.dismiss === Swal.DismissReason.cancel) {
+                // Botón Quitar Descuento
+                item.desc_tipo = '';
+                item.desc_valor = 0;
+                item.desc_label = '';
+                item.precio = precioRealSinDesc;
+            }
+
+            // Recalculamos el subtotal de la fila y actualizamos la tabla
+            item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+            renderizarTabla();
+        });
+    };
 
     document.addEventListener('DOMContentLoaded',  () => { 
         const modales = document.querySelectorAll('.modal');
@@ -1241,7 +1296,7 @@ function guardarNuevoServicio() {
 }
 
 document.getElementById('btnAgregar').addEventListener('click', () => {
-    let itemParaCarrito = {};
+    let itemParaCarrito = {desc_tipo: '',desc_valor: 0,desc_label: ''};
     
     // 1. OBTENCIÓN Y VALIDACIÓN PREVIA DE VALORES NUMÉRICOS
     const rawPrecio = $('#precioManualInput').val();
@@ -1321,7 +1376,10 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
                 stock: stockProd, cantidad: cant, precio: precio, precioBase: precioBase, 
                 subtotal: parseFloat((cant * precio).toFixed(2)), 
                 tipo_precio: 'Manual', tipo: 'PRODUCTO',
-                um: unidadMedida 
+                um: unidadMedida,
+                desc_tipo: '', 
+                desc_valor: 0, 
+                desc_label: ''
             }; 
             carrito.push(itemParaCarrito); 
         }
@@ -1678,7 +1736,7 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
                 <tr id="fila-${index}">
                     <td class="ps-3">
                         <div class="product-name-cell" style="font-size: 0.85rem;">
-                            ${item.nombre} ${etiquetaTipo}
+                            ${item.nombre} ${etiquetaTipo} <br> <span class="badge bg-danger mt-1">${item.desc_label}</span>
                         </div>
                         <div class="small text-muted fw-light">${item.sku}</div>
                         <span class="badge bg-danger ms-1" style="font-size:0.6rem; display:${badgeDisplay};">
@@ -1710,6 +1768,9 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
 
                     <td class="text-center text-nowrap pt-2">
                         ${botonVer}
+                        <button class="btn btn-sm btn-outline-warning border-0" onclick="aplicarDescuentoItem(${index})" title="Aplicar Descuento a este Item">
+                            <i class="bi bi-percent"></i>
+                        </button>
                         <button class="btn btn-sm btn-outline-danger border-0" onclick="eliminarFila(${index})" title="Eliminar ítem">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -1909,28 +1970,57 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
 
     function eliminarFila(index) { carrito.splice(index, 1); renderizarTabla(); }
 
-    function recalcularCarritoPorMoneda() {
+function recalcularCarritoPorMoneda() {
         let moneda = $('#selectMoneda').val(); 
         let tc = parseFloat($('#inputTC').val()) || 1;
         let simbolo = moneda === 'PEN' ? 'S/' : '$';
 
         $('#simboloMonedaInput').text(simbolo); 
-        $('#lblMonedaUnit').text(moneda); 
+        $('#lblMonedaUnit').text(moneda);  
         
-        // Actualizar símbolo del selector de descuento
+        // Actualizar símbolo del selector de descuento general (El que está abajo de la tabla)
         $('#tipoDescuento option[value="MONTO"]').text(simbolo); 
 
         calcularPrecioUnitarioVisual();
         
         if(carrito.length > 0) {
-            Swal.fire({ title: 'Cambio de Moneda', text: 'Se recalcularán los precios.', icon: 'warning', showCancelButton: true }).then((r) => {
+            Swal.fire({ 
+                title: 'Cambio de Moneda', 
+                text: 'Se recalcularán los precios y descuentos.', 
+                icon: 'warning', 
+                showCancelButton: true 
+            }).then((r) => {
                 if(r.isConfirmed) { 
                     carrito.forEach(item => { 
-                        if(moneda === 'PEN') item.precio = parseFloat((item.precioBase * tc).toFixed(6)); 
-                        else item.precio = item.precioBase; 
+                        
+                        // --- INICIO DEL NUEVO CÁLCULO DE DESCUENTO (PASO D) ---
+                        let precio_puro = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
+                        
+                        // Reaplicar descuento individual si lo tiene
+                        if (item.desc_valor > 0) {
+                            if (item.desc_tipo === '%') {
+                                item.precio = precio_puro * (1 - (item.desc_valor / 100));
+                            } else {
+                                // Si es un descuento en moneda fija ($ o S/), lo aproximamos a la nueva moneda
+                                let desc_monto_base = (moneda === 'PEN') ? (item.desc_valor * tc) : (item.desc_valor / tc); 
+                                item.precio = precio_puro - desc_monto_base;
+                                if (item.precio < 0) item.precio = 0;
+                            }
+                        } else {
+                            item.precio = precio_puro;
+                        }
+                        
+                        // Asegurar 6 decimales internos para no perder centavos en matemáticas de JS
+                        item.precio = parseFloat(item.precio.toFixed(6));
+                        // --- FIN DEL NUEVO CÁLCULO ---
+
                         item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100; 
                     }); 
                     renderizarTabla(); 
+                } else {
+                    // Si el usuario cancela, volvemos el selector visual a la moneda anterior
+                    $('#selectMoneda').val(monedaAnterior);
+                    actualizarSimbolosVisuales(monedaAnterior);
                 }
             });
         }
