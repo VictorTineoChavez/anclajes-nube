@@ -1547,12 +1547,16 @@ def preview_minimos():
 # --- 2. RUTA DE ACTUALIZACIÓN MASIVA (POR IDs SELECCIONADOS) ---
 @app.route('/config/minimos_masivos', methods=['POST'])
 def actualizar_minimos_masivos():
-    if session.get('role') != 'admin': return {'status': 'error', 'msg': 'No autorizado'}, 403
+    # Permitimos a admin y almacen (que son los que tienen el botón)
+    if session.get('role') not in ['admin', 'almacen']: 
+        return {'status': 'error', 'msg': 'No autorizado'}, 403
     
     data = request.get_json()
+    if not data:
+        return {'status': 'error', 'msg': 'No se recibieron datos correctamente.'}
+
     ids = data.get('ids', [])
     
-    # --- CORRECCIÓN AQUÍ: Aseguramos que el mínimo sea un número entero válido ---
     try:
         nuevo_minimo = int(data.get('nuevo_minimo'))
         if nuevo_minimo < 0: raise ValueError("No negativos")

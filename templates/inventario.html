@@ -711,9 +711,12 @@
         fetch('/config/minimos_masivos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: ids, nuevo_minimo: nuevo_minimo })
+            body: JSON.stringify({ ids: ids, nuevo_minimo: nuevoMinimo })
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error("Error interno del servidor (Código " + r.status + ")");
+            return r.json();
+        })
         .then(data => {
             if (data.status === 'success') {
                 Swal.fire('¡Completado!', data.msg, 'success').then(() => location.reload());
@@ -722,8 +725,9 @@
             }
         })
         .catch(err => {
-            console.error(err);
-            Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
+            console.error("Error en Fetch:", err);
+            Swal.close(); // Forzamos a que se cierre el "Cargando..."
+            Swal.fire('Error de Conexión', 'Ocurrió un problema de red o el servidor devolvió un error inesperado.', 'error');
         });
     }
 
