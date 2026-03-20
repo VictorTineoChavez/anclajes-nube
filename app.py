@@ -1511,7 +1511,7 @@ def listar_todos_clientes():
     
     return {'data': data}
 
-# --- 1. API PARA PREVISUALIZAR EL CAMBIO (SOLO CUENTA) ---
+# --- 1. API PARA PREVISUALIZAR LA LISTA COMPLETA ---
 @app.route('/api/preview_minimos', methods=['POST'])
 def preview_minimos():
     if session.get('role') != 'admin': return {'status': 'error', 'msg': 'No autorizado'}, 403
@@ -1526,52 +1526,55 @@ def preview_minimos():
     if calidad and calidad != 'TODAS':
         query = query.filter_by(calidad=calidad)
         
-    # Obtener cantidad y algunos ejemplos
-    total = query.count()
-    ejemplos = [p.nombre for p in query.limit(3).all()]
+    productos = query.order_by(Product.sku.asc()).all()
+    
+    # Armar lista completa para la tabla
+    lista = []
+    for p in productos:
+        lista.append({
+            'id': p.id,
+            'sku': p.sku,
+            'nombre': p.nombre,
+            'min_actual': p.stock_minimo
+        })
     
     return {
         'status': 'success',
-        'total': total,
-        'ejemplos': ejemplos
+        'total': len(lista),
+        'productos': lista
     }
 
-# --- 2. RUTA DE ACTUALIZACIÓN MASIVA (ACTUALIZADA) ---
+# --- 2. RUTA DE ACTUALIZACIÓN MASIVA (POR IDs SELECCIONADOS) ---
 @app.route('/config/minimos_masivos', methods=['POST'])
 def actualizar_minimos_masivos():
-    if session.get('role') != 'admin': return "No autorizado", 403
+    if session.get('role') != 'admin': return {'status': 'error', 'msg': 'No autorizado'}, 403
     
-    familia = request.form.get('categoria_nombre')
-    calidad = request.form.get('calidad_nombre') # Nuevo campo
+    data = request.get_json()
+    ids = data.get('ids', [])
+    nuevo_minimo = data.get('nuevo_minimo')
     
     try:
-        nuevo_minimo = int(request.form.get('nuevo_minimo'))
+        nuevo_minimo = int(nuevo_minimo)
         if nuevo_minimo < 0: raise ValueError("No negativos")
     except:
-        flash('Error: Cantidad inválida.')
-        return redirect(url_for('inventario'))
+        return {'status': 'error', 'msg': 'Cantidad de stock mínimo inválida.'}
+
+    if not ids:
+        return {'status': 'error', 'msg': 'Debe seleccionar al menos un producto.'}
 
     try:
-        # Construir query para actualizar
-        query = Product.query.filter_by(categoria=familia)
-        
-        criterio_texto = f"Familia: {familia}"
-        
-        if calidad and calidad != 'TODAS':
-            query = query.filter_by(calidad=calidad)
-            criterio_texto += f" | Calidad: {calidad}"
-            
-        # Ejecutar Update Masivo
-        resultado = query.update({Product.stock_minimo: nuevo_minimo}, synchronize_session=False)
+        # Ejecutar Update Masivo SOLO a los IDs seleccionados
+        resultado = Product.query.filter(Product.id.in_(ids)).update(
+            {Product.stock_minimo: nuevo_minimo}, 
+            synchronize_session=False
+        )
         
         db.session.commit()
-        flash(f'✅ Actualizados {resultado} productos. ({criterio_texto} ➝ Mínimo: {nuevo_minimo})')
+        return {'status': 'success', 'msg': f'Se actualizaron {resultado} productos al nuevo mínimo de {nuevo_minimo}.'}
         
     except Exception as e:
         db.session.rollback()
-        flash(f'Error masivo: {str(e)}')
-        
-    return redirect(url_for('inventario'))
+        return {'status': 'error', 'msg': str(e)}
 
 
 # --- 2. IMPORTACIÓN CON KARDEX (CORREGIDO) ---

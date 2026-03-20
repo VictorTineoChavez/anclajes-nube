@@ -485,6 +485,51 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalPreviewMasivo" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-list-check"></i> Seleccionar Productos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-0">
+                <div class="alert alert-warning m-3 py-2 small border-warning text-dark">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Desmarque los productos a los que <strong>NO</strong> desea aplicarles el nuevo stock mínimo.
+                </div>
+                
+                <div class="table-responsive bg-white border-top border-bottom" style="max-height: 400px;">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top small text-muted text-uppercase">
+                            <tr>
+                                <th class="text-center" style="width: 50px;">
+                                    <input class="form-check-input border-secondary" type="checkbox" id="checkAllMasivo" checked onchange="toggleAllMasivo(this)" style="cursor: pointer; width: 1.2rem; height: 1.2rem;">
+                                </th>
+                                <th style="width: 20%;">Código</th>
+                                <th style="width: 45%;">Descripción</th>
+                                <th class="text-center" style="width: 15%;">Mín. Actual</th>
+                                <th class="text-center text-success" style="width: 20%;">Nuevo Mín.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyPreviewMasivo">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between bg-white py-3">
+                <div class="small text-muted fw-bold">
+                    Seleccionados: <span id="lblTotalAfectados" class="badge bg-primary fs-6">0</span>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-outline-secondary me-2" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success fw-bold px-4" id="btnGuardarMasivoFinal" onclick="guardarMasivoFinal()">
+                        <i class="bi bi-check-circle-fill"></i> Aplicar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // --- INICIO DE CARGA (TODO LO QUE DEBE PASAR AL ABRIR LA PÁGINA) ---
     document.addEventListener('DOMContentLoaded', () => {
@@ -586,9 +631,9 @@
         const cantidad = cantidadInput.value;
         const calidad = calidadSelect.value;
 
-        if (!familia) { Swal.fire({ icon: 'warning', title: 'Falta información', text: 'Por favor, seleccione una Familia obligatoriamente.' }); return; }
-        if (!cantidad || cantidad === "") { Swal.fire({ icon: 'warning', title: 'Falta información', text: 'Debe ingresar una cantidad para el Stock Mínimo.' }); return; }
-        if (parseInt(cantidad) < 0) { Swal.fire({ icon: 'error', title: 'Cantidad inválida', text: 'El Stock Mínimo no puede ser negativo.' }); return; }
+        if (!familia) { Swal.fire({ icon: 'warning', title: 'Falta información', text: 'Por favor, seleccione una Familia.' }); return; }
+        if (!cantidad || cantidad === "") { Swal.fire({ icon: 'warning', title: 'Falta información', text: 'Ingrese el nuevo Stock Mínimo.' }); return; }
+        if (parseInt(cantidad) < 0) { Swal.fire({ icon: 'error', title: 'Cantidad inválida', text: 'No puede ser negativo.' }); return; }
 
         let formData = new FormData();
         formData.append('categoria_nombre', familia);
@@ -599,19 +644,87 @@
         fetch('/api/preview_minimos', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(data => {
+            Swal.close();
             if (data.status === 'success') {
                 if (data.total === 0) {
                     let msgError = `No existen productos de la familia <b>"${familia}"</b>` + (calidad !== 'TODAS' ? ` con calidad <b>"${calidad}"</b>.` : `.`);
                     Swal.fire({ icon: 'info', title: 'Sin coincidencias', html: msgError });
                     return;
                 }
-                let msgHtml = `<div class="text-start bg-light p-3 rounded border"><p class="mb-1">Se modificará el Stock Mínimo a <b>${cantidad}</b> u.</p><p class="mb-2">Afectados: <span class="badge bg-primary">${data.total}</span></p><hr class="my-1"><small class="fw-bold">Ejemplos:</small><ul class="mb-0 small text-muted ps-3">${data.ejemplos.map(e => `<li>${e}</li>`).join('')}${data.total > 3 ? '<li>...</li>' : ''}</ul></div>`;
-                Swal.fire({
-                    title: '¿Aplicar cambios?', html: msgHtml, icon: 'question', showCancelButton: true, confirmButtonColor: '#212529', confirmButtonText: 'Sí, aplicar'
-                }).then((r) => { if (r.isConfirmed) document.getElementById('formConfigMasiva').submit(); });
+                
+                // 1. Ocultar el modal de configuración
+                bootstrap.Modal.getInstance(document.getElementById('modalConfigMasiva')).hide();
+                
+                // 2. Llenar la tabla del nuevo modal
+                const tbody = document.getElementById('tbodyPreviewMasivo');
+                tbody.innerHTML = '';
+                
+                data.productos.forEach(p => {
+                    tbody.innerHTML += `
+                        <tr class="fila-masiva">
+                            <td class="text-center">
+                                <input class="form-check-input check-masivo border-secondary" type="checkbox" value="${p.id}" checked onchange="actualizarConteoMasivo()" style="cursor: pointer; width: 1.2rem; height: 1.2rem;">
+                            </td>
+                            <td class="small fw-bold text-primary">${p.sku}</td>
+                            <td class="small text-truncate" style="max-width: 300px;" title="${p.nombre}">${p.nombre}</td>
+                            <td class="text-center small fw-bold text-muted">${p.min_actual}</td>
+                            <td class="text-center fw-bold text-success">${cantidad}</td>
+                        </tr>
+                    `;
+                });
+                
+                document.getElementById('lblTotalAfectados').innerText = data.total;
+                document.getElementById('checkAllMasivo').checked = true;
+                document.getElementById('btnGuardarMasivoFinal').dataset.nuevoMinimo = cantidad;
+                
+                // 3. Mostrar el nuevo modal de la tabla
+                new bootstrap.Modal(document.getElementById('modalPreviewMasivo')).show();
+
             } else { Swal.fire('Error', data.msg, 'error'); }
         })
         .catch(err => { console.error(err); Swal.fire('Error', 'Conexión fallida', 'error'); });
+    }
+
+    // Funciones de Checkboxes y Guardado Final
+    function toggleAllMasivo(source) {
+        const checkboxes = document.querySelectorAll('.check-masivo');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+        actualizarConteoMasivo();
+    }
+
+    function actualizarConteoMasivo() {
+        const checkeds = document.querySelectorAll('.check-masivo:checked').length;
+        document.getElementById('lblTotalAfectados').innerText = checkeds;
+    }
+
+    function guardarMasivoFinal() {
+        const checkboxes = document.querySelectorAll('.check-masivo:checked');
+        const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        const nuevoMinimo = document.getElementById('btnGuardarMasivoFinal').dataset.nuevoMinimo;
+
+        if (ids.length === 0) {
+            return Swal.fire('Atención', 'Debe seleccionar al menos un producto de la lista.', 'warning');
+        }
+
+        Swal.fire({ title: 'Aplicando Cambios...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+        fetch('/config/minimos_masivos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids, nuevo_minimo: nuevo_minimo })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                Swal.fire('¡Completado!', data.msg, 'success').then(() => location.reload());
+            } else {
+                Swal.fire('Error', data.msg, 'error');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
+        });
     }
 
     function abrirAjuste(id, nombre, stockActual) {
