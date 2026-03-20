@@ -4,7 +4,9 @@ import pytz
 
 
 def hora_peru():
-    return datetime.now(pytz.timezone('America/Lima'))
+    # Obtiene la hora exacta de Lima, pero le quita la 'etiqueta' de zona horaria (.replace)
+    # para que sea 100% compatible con la base de datos (offset-naive)
+    return datetime.now(pytz.timezone('America/Lima')).replace(tzinfo=None)
 
 db = SQLAlchemy()
 

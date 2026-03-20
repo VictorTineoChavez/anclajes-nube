@@ -26,7 +26,9 @@ import pytz
 
 
 def hora_peru():
-    return datetime.now(pytz.timezone('America/Lima'))
+    # Obtiene la hora exacta de Lima, pero le quita la 'etiqueta' de zona horaria (.replace)
+    # para que sea 100% compatible con la base de datos (offset-naive)
+    return datetime.now(pytz.timezone('America/Lima')).replace(tzinfo=None)
 # --- FUNCIÓN AUXILIAR PARA GUARDAR HISTORIAL ---
 def registrar_log(accion, icono='bi-info-circle', color='text-primary'):
     if 'user_id' in session:
