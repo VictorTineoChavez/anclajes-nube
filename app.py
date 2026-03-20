@@ -22,6 +22,7 @@ import io
 import requests
 import re
 import pytz
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 
@@ -214,7 +215,7 @@ def consulta_documento():
 
     # CASO B: Consultar API (Costo)
     print(f">>> [API] Consultando datos externos para {numero}...")
-    TOKEN = "sk_12670.ui2wHSfVrMuNYZjMPJ91X62009eTcWdN" 
+    TOKEN = os.getenv('SUNAT_API_KEY')
     URL_RUC = "https://api.decolecta.com/v1/sunat/ruc"
     URL_DNI = "https://api.decolecta.com/v1/reniec/dni"
     
@@ -361,7 +362,7 @@ def obtener_tipo_cambio(usuario_solicitante="Sistema", forzar=False):
     # 2. CONSULTA API (Solo si pasó los filtros)
     if debo_consultar:
         print(f"--- 🟢 API SUNAT ({motivo_consulta}) ---")
-        TOKEN = "sk_12670.ui2wHSfVrMuNYZjMPJ91X62009eTcWdN"
+        TOKEN = os.getenv('SUNAT_API_KEY')
         URL = "https://api.decolecta.com/v1/tipo-cambio/sunat"
         
         try:
@@ -505,7 +506,7 @@ def login():
         
         user = User.query.filter_by(username=username).first()
         
-        if user and user.password == password:
+        if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             session['role'] = user.role
             session['username'] = user.username
@@ -883,7 +884,7 @@ def guardar_usuario():
             usuario.email_empresa = email
             
             if password:
-                usuario.password = password
+                usuario.password = generate_password_hash(password)
                 flash(f'✅ Perfil de {nombres} actualizado con nueva contraseña.')
             else:
                 flash(f'✅ Perfil de {nombres} actualizado.')
@@ -896,7 +897,7 @@ def guardar_usuario():
             nuevo = User(
                 username=username, 
                 nombre_completo=nombre_final, 
-                password=password, 
+                password=generate_password_hash(password), 
                 role=rol, 
                 celular=celular,
                 cargo_formal=cargo, 
@@ -940,16 +941,16 @@ def perfil_usuario():
                     flash('⛔ Para cambiar la contraseña, debe ingresar su contraseña actual.', 'error')
                     return redirect(url_for('perfil_usuario'))
                 
-                if usuario.password != pass_actual:
+                if not check_password_hash(usuario.password, pass_actual):
                     flash('⛔ La contraseña actual ingresada es incorrecta.', 'error')
-                    return redirect(url_for('perfil_usuario'))
+                    return redirect(url_for('perfil_usuario'))  
                     
                 if pass_nueva != pass_confirm:
                     flash('⛔ Las nuevas contraseñas no coinciden.', 'error')
                     return redirect(url_for('perfil_usuario'))
                 
                 # Si todo ok, cambiamos la clave
-                usuario.password = pass_nueva
+                usuario.password = generate_password_hash(pass_nueva)
                 flash('✅ Contraseña actualizada correctamente.', 'success')
             
             db.session.commit()
