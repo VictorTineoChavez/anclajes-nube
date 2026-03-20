@@ -1551,10 +1551,10 @@ def actualizar_minimos_masivos():
     
     data = request.get_json()
     ids = data.get('ids', [])
-    nuevo_minimo = data.get('nuevo_minimo')
     
+    # --- CORRECCIÓN AQUÍ: Aseguramos que el mínimo sea un número entero válido ---
     try:
-        nuevo_minimo = int(nuevo_minimo)
+        nuevo_minimo = int(data.get('nuevo_minimo'))
         if nuevo_minimo < 0: raise ValueError("No negativos")
     except:
         return {'status': 'error', 'msg': 'Cantidad de stock mínimo inválida.'}
