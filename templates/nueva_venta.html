@@ -330,7 +330,12 @@
     <div class="col-lg-7 col-md-12">
         <div class="card shadow-sm h-100 border-0">
             <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 text-primary fw-light">Detalle de Cotización</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="mb-0 text-primary fw-light">Detalle de Cotización</h5>
+                    <button class="btn btn-sm btn-warning shadow-sm fw-bold ms-2" onclick="aplicarDescuentoMasivo()" title="Aplicar descuento a todos los ítems">
+                        <i class="bi bi-percent"></i> Masivo
+                    </button>
+                </div>
                 <span id="badgeTC_Visual" class="badge bg-warning text-dark border border-dark d-none">
                     T.C. <span id="lblTC_Visual">0.000</span>
                 </span>
@@ -1020,6 +1025,7 @@
         if(bCon) { bCon.innerText = `Cond: ${condicion}`; bCon.className = condicion === 'HABIDO' ? 'badge bg-success' : 'badge bg-warning text-dark'; bCon.classList.remove('opacity-50'); }
     }
 
+// --- 4. FUNCIONES DE CLIENTE Y SUNAT (Restauradas) ---
     function inicializarSelect2Cliente() {
         $('#cli_doc_select').select2({
             placeholder: "Escriba RUC o Nombre...", allowClear: true, width: '100%', tags: true, 
@@ -1036,7 +1042,7 @@
                 $('#cli_tel').val(data.telefono || '');
                 $('#hidden_estado').val(data.estado);
                 $('#hidden_condicion').val(data.condicion);
-                actualizarBadges(data.estado, data.condicion);
+                if(typeof actualizarBadges === 'function') actualizarBadges(data.estado, data.condicion);
                 $('#lbl_origen_datos').html(`<i class="bi bi-database"></i> Sistema (${data.updated})`);
             } else {
                 $('#cli_nom').val("").prop('readonly', true); $('#cli_dir').val("").prop('readonly', true); $('#cli_tel').val(""); $('#lbl_origen_datos').html(`<i class="bi bi-pencil"></i> RUC Nuevo`);
