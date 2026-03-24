@@ -330,12 +330,7 @@
     <div class="col-lg-7 col-md-12">
         <div class="card shadow-sm h-100 border-0">
             <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-2">
-                    <h5 class="mb-0 text-primary fw-light">Detalle de Cotización</h5>
-                    <button class="btn btn-sm btn-warning shadow-sm fw-bold ms-2" onclick="aplicarDescuentoMasivo()" title="Aplicar descuento a todos los ítems">
-                        <i class="bi bi-percent"></i> Masivo
-                    </button>
-                </div>
+                <h5 class="mb-0 text-primary fw-light">Detalle de Cotización</h5>
                 <span id="badgeTC_Visual" class="badge bg-warning text-dark border border-dark d-none">
                     T.C. <span id="lblTC_Visual">0.000</span>
                 </span>
@@ -648,26 +643,6 @@
     let monedaAnterior = 'USD'; // Variable para recordar estado anterior si cancela}
 
 
-    // --- NUEVO: REESCRIBIR PRECIO MANUALMENTE ---
-    window.actualizarFilaManual = function(index, valor) {
-        let val = parseFloat(valor);
-        if (isNaN(val) || val < 0) val = 0;
-        
-        let item = carrito[index];
-        item.precio = val;
-        
-        // Si el usuario escribe manualmente en la caja, MATAMOS los descuentos previos
-        // para que el sistema no se confunda.
-        item.desc_tipo = '';
-        item.desc_valor = 0;
-        item.desc_label = '';
-        
-        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
-        renderizarTabla(); // Redibujamos para quitar el tachado
-    };
-
-
-// --- DESCUENTO INDIVIDUAL (CON LÍMITES) ---
     window.aplicarDescuentoItem = function(index) {
         let item = carrito[index];
         let moneda = $('#selectMoneda').val();
@@ -679,7 +654,7 @@
                 <div class="text-start small text-muted mb-2">${item.nombre}</div>
                 <select id="swal-desc-tipo" class="form-select mb-2">
                     <option value="%">Porcentaje (%)</option>
-                    <option value="MONTO">Monto Directo c/u (${simbolo})</option>
+                    <option value="MONTO">Monto Directo (${simbolo})</option>
                 </select>
                 <input id="swal-desc-valor" type="number" class="form-control" placeholder="Ej: 10" min="0" step="any">
             `,
@@ -696,94 +671,29 @@
                 let valor = parseFloat(document.getElementById('swal-desc-valor').value) || 0;
 
                 if (valor > 0) {
-                    if (tipo === 'MONTO' && valor >= precioRealSinDesc) {
-                        return Swal.fire('Error', `El descuento (${simbolo}${valor}) no puede ser mayor o igual al precio original (${simbolo}${precioRealSinDesc.toFixed(2)}).`, 'error');
-                    }
-
                     item.desc_tipo = tipo;
                     item.desc_valor = valor;
 
                     if (tipo === '%') {
-                        if (valor >= 100) return Swal.fire('Error', 'El descuento no puede ser 100% o más.', 'error');
                         item.precio = precioRealSinDesc * (1 - (valor / 100));
-                        item.desc_label = `Desc: -${valor}%`;
+                        item.desc_label = `Descuento: -${valor}%`;
                     } else {
                         item.precio = precioRealSinDesc - valor;
-                        item.desc_label = `Desc: -${simbolo}${valor} c/u`;
+                        if (item.precio < 0) item.precio = 0;
+                        item.desc_label = `Descuento: -${simbolo}${valor}`;
                     }
                 }
             } else if (res.dismiss === Swal.DismissReason.cancel) {
-                item.desc_tipo = ''; item.desc_valor = 0; item.desc_label = '';
+                // Botón Quitar Descuento
+                item.desc_tipo = '';
+                item.desc_valor = 0;
+                item.desc_label = '';
                 item.precio = precioRealSinDesc;
             }
 
+            // Recalculamos el subtotal de la fila y actualizamos la tabla
             item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
             renderizarTabla();
-        });
-    };
-
-    // --- NUEVO: DESCUENTO MASIVO A TODOS LOS ITEMS ---
-    window.aplicarDescuentoMasivo = function() {
-        if (carrito.length === 0) return Swal.fire('Carrito Vacío', 'Agregue productos primero.', 'warning');
-        
-        let moneda = $('#selectMoneda').val();
-        let simbolo = moneda === 'PEN' ? 'S/' : '$';
-
-        Swal.fire({
-            title: 'Descuento a Toda la Lista',
-            html: `
-                <div class="text-start small text-muted mb-2">Aplica este descuento línea por línea:</div>
-                <select id="swal-desc-tipo-masivo" class="form-select mb-2">
-                    <option value="%">Porcentaje (%)</option>
-                    <option value="MONTO">Monto Directo c/u (${simbolo})</option>
-                </select>
-                <input id="swal-desc-valor-masivo" type="number" class="form-control border-warning" placeholder="Ej: 5" min="0" step="any">
-                <div class="form-text small mt-2 text-danger"><i class="bi bi-exclamation-circle"></i> Esto sobreescribirá cualquier descuento previo en los ítems.</div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: 'Aplicar a Todos',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#ffc107',
-        }).then(res => {
-            if (res.isConfirmed) {
-                let tipo = document.getElementById('swal-desc-tipo-masivo').value;
-                let valor = parseFloat(document.getElementById('swal-desc-valor-masivo').value) || 0;
-                let tc = parseFloat($('#inputTC').val()) || 1;
-                
-                if (valor > 0) {
-                    carrito.forEach(item => {
-                        let precioRealSinDesc = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
-                        
-                        // Validar límites por ítem para que el bucle no rompa precios a negativos
-                        if (tipo === 'MONTO' && valor >= precioRealSinDesc) {
-                            item.precio = 0.01; // Lo dejamos en un centavo si el descuento masivo es muy agresivo
-                            item.desc_tipo = 'MONTO'; item.desc_valor = (precioRealSinDesc - 0.01);
-                            item.desc_label = `Límite alcanzado`;
-                        } else if (tipo === '%' && valor >= 100) {
-                            item.precio = 0.01;
-                            item.desc_tipo = '%'; item.desc_valor = 99.9;
-                            item.desc_label = `Límite alcanzado`;
-                        } else {
-                            item.desc_tipo = tipo;
-                            item.desc_valor = valor;
-                            
-                            if (tipo === '%') {
-                                item.precio = precioRealSinDesc * (1 - (valor / 100));
-                                item.desc_label = `Desc Masivo: -${valor}%`;
-                            } else {
-                                item.precio = precioRealSinDesc - valor;
-                                item.desc_label = `Desc Masivo: -${simbolo}${valor} c/u`;
-                            }
-                        }
-                        
-                        item.precio = parseFloat(item.precio.toFixed(6));
-                        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
-                    });
-                    
-                    renderizarTabla();
-                    Swal.fire({toast:true, position:'top-end', icon:'success', title:'Descuento Masivo Aplicado', showConfirmButton:false, timer:2000});
-                }
-            }
         });
     };
 
@@ -1821,23 +1731,12 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
                 botonVer = `<button class="btn btn-sm ${colorOjo} me-1" onclick="verComponentes(${index})" title="Ver contenido"><i class="bi bi-eye-fill"></i></button>`;
             }
 
-            let precioTachadoHtml = '';
-            let inputClass = 'editable-cell';
-            
-            if (item.desc_valor > 0) {
-                // Si hay descuento, calculamos el precio original y lo tachamos
-                let tc_actual = parseFloat($('#inputTC').val()) || 1;
-                let precioOriginal = (moneda === 'PEN') ? (item.precioBase * tc_actual) : item.precioBase;
-                precioTachadoHtml = `<del class="text-muted d-block" style="font-size: 0.75rem; margin-bottom: -2px;">${precioOriginal.toFixed(2)}</del>`;
-                inputClass = 'editable-cell text-danger fw-bold border-danger bg-danger bg-opacity-10'; // Pintamos la cajita para resaltar el descuento
-            }
-
             // 3. CONSTRUCCIÓN DEL HTML DE LA FILA
             tbody.append(`
                 <tr id="fila-${index}">
                     <td class="ps-3">
                         <div class="product-name-cell" style="font-size: 0.85rem;">
-                            ${item.nombre} ${etiquetaTipo}
+                            ${item.nombre} ${etiquetaTipo} <br> <span class="badge bg-danger mt-1">${item.desc_label}</span>
                         </div>
                         <div class="small text-muted fw-light">${item.sku}</div>
                         <span class="badge bg-danger ms-1" style="font-size:0.6rem; display:${badgeDisplay};">
@@ -1847,7 +1746,7 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
 
                     <td class="text-center small text-muted fw-bold pt-3">${umVisual}</td>
                     
-                    <td class="text-center pt-3">
+                    <td class="text-center">
                         <input type="number" id="input_cant_${index}" 
                                class="editable-cell text-center ${claseStock}" 
                                style="width: 70px;" value="${item.cantidad}" min="1" step="1"
@@ -1855,22 +1754,21 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
                                oninput="actualizarFilaSinRedibujar(${index}, 'cant', this.value)">
                     </td>
 
-                    <td class="text-end pt-2">
-                        ${precioTachadoHtml}
+                    <td class="text-end">
                         <input type="number" id="input_precio_${index}" 
-                               class="${inputClass}" 
+                               class="editable-cell" 
                                style="width: 90px;" value="${item.precio}" min="0" step="any"
                                onkeydown="return evitarNegativos(event)"
-                               onchange="actualizarFilaManual(${index}, this.value)">
+                               oninput="actualizarFilaSinRedibujar(${index}, 'precio', this.value)">
                     </td>
 
                     <td class="text-end fw-bold text-dark small pt-3">
                         ${simbolo} <span id="lbl_subtotal_${index}">${item.subtotal.toFixed(2)}</span>
                     </td>
 
-                    <td class="text-center text-nowrap pt-3">
+                    <td class="text-center text-nowrap pt-2">
                         ${botonVer}
-                        <button class="btn btn-sm btn-outline-warning border-0" onclick="aplicarDescuentoItem(${index})" title="Aplicar Descuento">
+                        <button class="btn btn-sm btn-outline-warning border-0" onclick="aplicarDescuentoItem(${index})" title="Aplicar Descuento a este Item">
                             <i class="bi bi-percent"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-danger border-0" onclick="eliminarFila(${index})" title="Eliminar ítem">
@@ -1879,6 +1777,7 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
                     </td>
                 </tr>
             `);
+        });
 
         // 4. ACTUALIZAR TOTALES FINALES
         actualizarTotalesGlobales();
