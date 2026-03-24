@@ -1026,6 +1026,7 @@
     }
 
 // --- 4. FUNCIONES DE CLIENTE Y SUNAT (Restauradas) ---
+// --- 4. FUNCIONES DE CLIENTE Y SUNAT (Restauradas) ---
     function inicializarSelect2Cliente() {
         $('#cli_doc_select').select2({
             placeholder: "Escriba RUC o Nombre...", allowClear: true, width: '100%', tags: true, 
@@ -1033,6 +1034,7 @@
             ajax: { url: '/api/buscar_clientes_db', dataType: 'json', delay: 250, data: function (params) { return { q: params.term }; }, processResults: function (data) { return { results: data.results }; }, cache: true },
             minimumInputLength: 0
         });
+        
         $('#cli_doc_select').on('select2:select', function (e) {
             var data = e.params.data;
             if (data.nombre) {
@@ -1045,10 +1047,15 @@
                 if(typeof actualizarBadges === 'function') actualizarBadges(data.estado, data.condicion);
                 $('#lbl_origen_datos').html(`<i class="bi bi-database"></i> Sistema (${data.updated})`);
             } else {
-                $('#cli_nom').val("").prop('readonly', true); $('#cli_dir').val("").prop('readonly', true); $('#cli_tel').val(""); $('#lbl_origen_datos').html(`<i class="bi bi-pencil"></i> RUC Nuevo`);
+                // Si el RUC es nuevo (no existe en BD)
+                $('#cli_nom').val("").prop('readonly', true); 
+                $('#cli_dir').val("").prop('readonly', true); 
+                $('#cli_tel').val(""); 
+                $('#lbl_origen_datos').html(`<i class="bi bi-pencil"></i> RUC Nuevo`);
                 $('#inputDireccionEntrega').val("");
             }
         });
+        
         $('#cli_doc_select').on('select2:clear', function (e) { 
             $('#cli_nom').val(""); $('#cli_dir').val(""); $('#cli_tel').val(""); $('#lbl_origen_datos').html(""); 
             $('#inputDireccionEntrega').val("");
