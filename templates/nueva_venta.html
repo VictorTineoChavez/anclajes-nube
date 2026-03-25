@@ -1,1625 +1,5211 @@
 {% extends "base.html" %}
 
+
+
 {% block content %}
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
+
+
 <style>
+
     /* --- 1. PARCHE GLOBAL PARA QUE SELECT2 FUNCIONE EN BOOTSTRAP --- */
+
     .select2-container { width: 100% !important; display: block; }
+
     .select2-container .select2-selection--single { height: 31px !important; border: 1px solid #dee2e6; border-radius: 0.375rem; display: flex; align-items: center; background-color: #fff; }
+
     .select2-container--default .select2-selection--single .select2-selection__rendered { padding-left: 8px; line-height: normal; color: #212529; font-weight: bold; width: 100%; }
+
     .select2-container--default .select2-selection--single .select2-selection__arrow { height: 29px !important; right: 5px; }
+
     .select2-search--dropdown .select2-search__field { padding: 4px; border-radius: 4px; border: 1px solid #aaa; }
 
+
+
     /* --- 2. ESTILOS ESPECÍFICOS PARA EL BUSCADOR DE PRODUCTOS (TABLA) --- */
+
     .select2-results__option { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; }
+
     .prod-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
     .prod-code { width: 25%; font-weight: bold; color: #0d6efd; font-size: 0.85rem; }
+
     .prod-desc { width: 55%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; color: #333; }
+
     .prod-stock { width: 20%; text-align: right; font-weight: 800; color: #198754; font-size: 0.85rem; }
 
+
+
     /* --- 3. ESTILOS DE LA TABLA DE CARRITO --- */
+
     .editable-cell { background: #fff; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px 8px; width: 100%; text-align: right; font-weight: 600; transition: border-color 0.2s; }
+
     .editable-cell:focus { border-color: #0d6efd; outline: none; background: #f8f9fa; }
+
     .stock-insuficiente { background-color: #ffe6e6 !important; border-color: #dc3545 !important; color: #dc3545 !important; font-weight: bold; }
+
     .product-name-cell { white-space: normal !important; word-wrap: break-word; font-size: 0.9rem; line-height: 1.3; font-weight: 600; color: #212529; }
+
 </style>
 
+
+
 <div class="d-flex justify-content-between align-items-center mb-3">
+
     <h3>
+
         <i class="bi bi-file-earmark-text"></i> 
+
         {% if modo_edicion %}
+
             Editar Cotización #{{ "%05d"|format(orden.id) }}
+
         {% else %}
+
             Nueva Cotización
+
         {% endif %}
+
     </h3>
+
     <a href="{{ url_for('historial_ventas') }}" class="btn btn-outline-secondary btn-sm">Cancelar</a>
+
 </div>
+
+
 
 <input type="hidden" id="hidden_order_id" value="{{ orden.id if orden else '' }}">
 
+
+
 <div class="card mb-3 border-info shadow-sm">
+
     <div class="card-body py-2 bg-info bg-opacity-10">
+
         <div class="row align-items-center g-2">
+
             <div class="col-auto">
+
                 <div class="input-group input-group-sm">
+
                     <span class="input-group-text fw-bold bg-white text-dark border-primary">
+
                         <i class="bi bi-currency-exchange me-1"></i> Moneda
+
                     </span>
+
                     <select id="selectMoneda" class="form-select fw-bold text-primary border-primary" onchange="window.iniciarCambioMoneda(this)">
+
                         <option value="PEN">S/ SOLES (PEN)</option>
+
                         <option value="USD" selected>  $ DÓLARES (USD)</option>
+
                     </select>
+
                 </div>
+
             </div>
+
             <div class="col-auto">
+
                 <div class="input-group input-group-sm">
+
                     <span class="input-group-text fw-bold bg-white text-muted">T.C. Venta</span>
+
                     <input type="number" id="inputTC" class="form-control fw-bold text-end" 
+
                            value="{{ '%.3f'|format(tc) }}" step="0.001" style="width: 80px;" 
+
                            onchange="window.recalcularCarritoPorMoneda()" readonly>
+
                     <button class="btn btn-light border bg-white" type="button" onclick="window.actualizarDolar()" title="Consultar SUNAT">
+
                         <i class="bi bi-arrow-clockwise text-primary"></i>
+
                     </button>
+
                 </div>
+
             </div>
+
             <div class="col-auto">
+
                 <small class="text-muted text-nowrap" id="msgTC" style="font-size: 0.75rem; min-width: 100px;">
+
                     {% if updated_at %} Act: {{ updated_at }} ({{ updated_by if updated_by else 'Sistema' }}) {% else %} Dato del día {% endif %}
+
                 </small>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
+
+
 
 <div class="row g-3">
+
     <div class="col-lg-5 col-md-12">
+
         
+
         <div class="card shadow-sm mb-3 border-0">
+
             <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+
                 <h6 class="mb-0 small fw-bold"><i class="bi bi-person-vcard"></i> 1. Cliente</h6>
+
                 <div>
+
                     <button class="btn btn-sm btn-light text-dark py-0 me-1 fw-bold shadow-sm" onclick="window.abrirDirectorioClientes()" title="Ver lista de todos los clientes">
+
                         <i class="bi bi-journal-bookmark-fill text-primary"></i> Directorio / Historial
+
                     </button>
+
                     
+
                     <button class="btn btn-sm btn-info text-primary py-0" onclick="window.guardarSoloCliente()" title="Guardar cambios de contacto">
+
                         <i class="bi bi-save"></i> Guardar Contacto
+
                     </button>
+
                 </div>
+
             </div>
+
             <div class="card-body bg-light">
+
                 <div class="row g-2">
+
                     <div class="col-md-6 col-12">
+
                         <label class="small text-muted mb-1">RUC / DNI *</label>
+
                         <div class="d-flex align-items-center w-100">
+
                             <div style="flex-grow: 1; min-width: 0;"> 
+
                                 <select id="cli_doc_select" style="width: 100%;">
+
                                     <option></option>
+
                                 </select>
+
                             </div>
+
                             <button class="btn btn-dark btn-sm ms-1" type="button" id="btnBuscarSunat" onclick="window.buscarClienteApi(false)" title="Consultar SUNAT">
+
                                 <i class="bi bi-search"></i>
+
                             </button>
+
                             <button class="btn btn-outline-danger btn-sm ms-1" type="button" onclick="window.confirmarForzado()" title="Forzar actualización">
+
                                 <i class="bi bi-cloud-arrow-down-fill"></i>
+
                             </button>
+
                         </div>
+
                     </div>
+
                     <div class="col-md-6 col-12">
+
                         <label class="small text-muted mb-1">Teléfono (Editable)</label>
+
                         <input type="text" id="cli_tel" class="form-control form-control-sm border-success" placeholder="Ingrese teléfono...">
+
                     </div>
+
                     <div class="col-12">
+
                         <label class="small text-muted mb-1">Nombre / Razón Social</label>
+
                         <input type="text" id="cli_nom" class="form-control form-control-sm bg-white fw-bold" readonly>
+
                     </div>
+
                     <div class="col-12">
+
                         <label class="small text-muted mb-1">Dirección Fiscal (SUNAT)</label>
+
                         <input type="text" id="cli_dir" class="form-control form-control-sm bg-white" readonly>
+
                     </div>
+
                     <div class="col-6">
+
                         <label class="small text-muted mb-1">Atención (Contacto)</label>
+
                         <input type="text" id="cli_atte" class="form-control form-control-sm" placeholder="Ej: Sr. Juan">
+
                     </div>
+
                     <div class="col-6">
+
                         <label class="small text-muted mb-1">O/C (Opcional)</label>
+
                         <input type="text" id="cli_oc" class="form-control form-control-sm" placeholder="N° Orden Compra">
+
                     </div>
+
                     
+
                     <input type="hidden" id="hidden_estado">
+
                     <input type="hidden" id="hidden_condicion">
 
+
+
                     <div class="col-12 d-flex gap-2 mt-1 align-items-center">
+
                         <span id="badge_estado" class="badge bg-secondary opacity-50">Estado: -</span>
+
                         <span id="badge_condicion" class="badge bg-secondary opacity-50">Condición: -</span>
+
                         <small class="text-muted ms-auto fst-italic" id="lbl_origen_datos" style="font-size: 0.7rem;"></small>
+
                     </div>
+
                 </div>
+
             </div>
+
         </div>
 
+
+
         <div class="card shadow-sm mb-3 border-0">
+
             <div class="card-header bg-secondary text-white py-2 d-flex justify-content-between align-items-center">
+
                 <h6 class="mb-0 small fw-bold"><i class="bi bi-box-seam"></i> 2. Agregar Item</h6>
+
                 <div class="btn-group btn-group-sm" role="group">
+
                     <input type="radio" class="btn-check" name="modeOption" id="modeProd" autocomplete="off" checked onclick="cambiarModo('PRODUCTO')">
+
                     <label class="btn btn-outline-light" for="modeProd">Producto</label>
+
             
+
                     <input type="radio" class="btn-check" name="modeOption" id="modeFab" autocomplete="off" onclick="cambiarModo('FABRICACION')">
+
                     <label class="btn btn-outline-light" for="modeFab">Fabricación</label>
+
             
+
                     <input type="radio" class="btn-check" name="modeOption" id="modeGlb" autocomplete="off" onclick="cambiarModo('GLB')">
+
                     <label class="btn btn-outline-light" for="modeGlb">Armado (GLB)</label>
+
                 </div>
+
             </div>
 
+
+
             <div class="card-body">
+
                 <div id="panelProducto">
+
                     <div class="row g-2 mb-2">
+
                         <div class="col-6">
+
                             <label class="small text-muted mb-1 fw-bold">1. Familia</label>
+
                             <select class="form-select form-select-sm" id="filtroFamiliaVenta" onchange="window.cargarCalidadesVenta()">
+
                                 <option value="" selected>-- Seleccione --</option>
+
                                 {% for c in categorias %} <option value="{{ c.id }}" data-nombre="{{ c.nombre }}">{{ c.nombre }}</option> {% endfor %}
+
                             </select>
+
                         </div>
+
                         <div class="col-6">
+
                             <label class="small text-muted mb-1 fw-bold">2. Calidad</label>
+
                             <select class="form-select form-select-sm" id="filtroCalidadVenta" disabled onchange="window.cargarProductos()">
+
                                 <option value="">-- Espere familia --</option>
+
                             </select>
+
                         </div>
+
                     </div>
+
                     <div class="mb-3">
+
                         <label class="small text-muted mb-1 fw-bold">3. Buscar Producto</label>
+
                         <select class="form-select" id="productoSelect" style="width: 100%;">
+
                             <option value="" disabled selected>Escriba para buscar...</option>
+
                         </select>
+
                     </div>
+
                 </div>
+
+
 
                 <div id="panelFabricacion" class="d-none">
+
                     <div class="row g-2 mb-3 align-items-end">
+
                         <div class="col-md-5">
+
                             <label class="small fw-bold text-muted">1. Tipo de Servicio</label>
+
                             <div class="input-group input-group-sm">
+
                                 <select id="selTipoServicio" class="form-select fw-bold text-primary">
+
                                     <option value="SRV-GEN" data-titulo="SERVICIO GENERAL">-- CARGANDO --</option>
+
                                 </select>
+
                                 <button class="btn btn-outline-success" type="button" onclick="abrirModalNuevoServicio()" title="Crear Nuevo Tipo">
+
                                     <i class="bi bi-plus-lg"></i>
+
                                 </button>
+
                             </div>
+
                         </div>
+
                         <div class="col-md-7">
+
                             <label class="small fw-bold text-muted">2. Descripción (EETT)</label>
+
                             <textarea id="fabDesc" class="form-control form-control-sm text-uppercase" rows="2" 
+
                                 placeholder="Ej: ARANDELA PLANA..."></textarea>
+
                         </div>
+
                     </div>
+
                 </div>
+
             
+
                 <div id="panelGLB" class="d-none">
+
                     <div class="alert alert-info small mb-3 p-2">
+
                         <i class="bi bi-tools"></i> <strong>Modo Armado:</strong> Cree un item compuesto por varios productos.
+
                     </div>
+
                     <button class="btn btn-outline-dark w-100 mb-3" onclick="abrirModalGLB()">
+
                         <i class="bi bi-layers-half"></i> Configurar Kit / Armado
+
                     </button>
+
                     <div id="glbPreview" class="small text-muted fst-italic text-center border rounded p-2 bg-light">Ningún kit configurado aún.</div>
+
                 </div>
+
+
 
                 <div class="row g-2 mb-2 align-items-end mt-2">
+
                     <div class="col-3">
+
                         <label class="small text-muted">Stock</label>
+
                         <input type="text" id="info_stock" class="form-control form-control-sm bg-light fw-bold text-center" readonly>
+
                     </div>
+
                     <div class="col-3">
+
                         <label class="small text-muted fw-bold">Cant.</label>
+
                         <input type="number" id="cantidadInput" class="form-control form-control-sm border-primary fw-bold text-center" 
+
                                value="1" min="1" 
+
                                onkeydown="return filtroTeclas(event, 'entero')"
+
                                oninput="validarEntradaString(this, 0)">
+
                     </div>
+
                     <div class="col-6">
+
                         <label class="small text-muted fw-bold text-primary">Precio Unit (<span id="lblMonedaUnit">USD</span>)</label>
+
                         <div class="input-group input-group-sm">
+
                             <span class="input-group-text" id="simboloMonedaInput">$</span>
+
                             <input type="number" id="precioManualInput" class="form-control fw-bold text-end" 
+
                                    step="any" 
+
                                    onkeydown="return filtroTeclas(event, 'decimal')"
+
                                    oninput="validarEntradaString(this, 6)">
+
                             <input type="hidden" id="precioBaseHidden"> 
+
                         </div>
+
                     </div>
+
                 </div>
+
+
 
                 <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded border mb-2">
+
                     <small class="text-muted">Total Línea:</small>
+
                     <strong class="text-dark fs-5" id="txt_subtotal_previo">$ 0.00</strong>
+
                 </div>
+
+
 
                 <button class="btn btn-success w-100 btn-sm fw-bold py-2" id="btnAgregar" disabled>
+
                     <i class="bi bi-plus-lg"></i> AGREGAR A LA LISTA
+
                 </button>
+
             </div>
+
         </div>
+
+
 
         <div class="card shadow-sm border-0 mb-3">
+
             <div class="card-header bg-light py-2">
+
                 <h6 class="mb-0 small fw-bold text-dark"><i class="bi bi-truck"></i> 3. Datos de Entrega</h6>
+
             </div>
+
             <div class="card-body py-2">
+
                 <div class="row g-2 align-items-center">
+
                 <div class="col-6">
+
                     <label class="small fw-bold">Fecha Entrega</label>
+
                     <div class="input-group input-group-sm">
+
                         <input type="date" id="inputFechaEntrega" class="form-control border-warning">
+
                         <span class="input-group-text bg-white text-muted" title="Limpiar" style="cursor:pointer" onclick="document.getElementById('inputFechaEntrega').value = ''">
+
                             <i class="bi bi-x"></i>
+
                         </span>
+
                     </div>
+
                     <div class="form-text fst-italic text-muted" style="font-size: 0.7rem;">
+
                         <i class="bi bi-info-circle"></i> Si se deja vacío, saldrá: <strong>"A COORDINAR"</strong>
+
                     </div>
+
                 </div>
+
                     <div class="col-6">
+
                         <label class="small">Tipo Entrega</label>
+
                         <select class="form-select form-select-sm" id="selectEntrega" onchange="window.toggleDireccionEntrega()">
+
                             <option value="Recojo">Recojo Tienda</option>
+
                             <option value="Envio">Envío Domicilio/Obra</option>
+
                         </select>
+
                     </div>
+
                     
+
                     <div class="col-12" id="divDireccionEntrega" style="display: none;">
+
                         <label class="small fw-bold text-primary">Dirección de Envío</label>
+
                         <div class="input-group input-group-sm">
+
                             <span class="input-group-text bg-white"><i class="bi bi-geo-alt-fill text-danger"></i></span>
+
                             <input type="text" id="inputDireccionEntrega" class="form-control form-control-sm border-primary" placeholder="Confirme o edite la dirección...">
+
                         </div>
+
                         <small class="text-muted fst-italic" style="font-size: 0.7rem;">* Se cargó la dirección fiscal, puede editarla.</small>
+
                     </div>
+
                 </div>
+
             </div>
+
         </div>
+
+
 
         <div class="card shadow-sm mb-3 border-0">
+
             <div class="card-header bg-light py-2">
+
                 <h6 class="mb-0 small fw-bold text-dark"><i class="bi bi-sliders"></i> 4. Condiciones Comerciales</h6>
+
             </div>
+
             <div class="card-body">
+
                 <div class="row g-3">
+
                     <div class="col-md-6">
+
                         <label class="small fw-bold text-muted">Condición de Pago</label>
+
                         <select id="inputCondicionPago" class="form-select form-select-sm">
+
                             <option value="Contado">Contado</option>
+
                             <option value="Contra-entrega">Contra-entrega</option>
+
                             <option value="Crédito 7 días">Crédito 7 días</option>
+
                             <option value="Crédito 15 días">Crédito 15 días</option>
+
                             <option value="Crédito 30 días">Crédito 30 días</option>
+
                             <option value="Crédito 45 días">Crédito 45 días</option>
+
                             <option value="Crédito 60 días">Crédito 60 días</option>
+
                             <option value="Factura Negociable">Factura Negociable</option>
+
                         </select>
+
                     </div>
+
         
+
                     <div class="col-md-6">
+
                         <label class="small fw-bold text-muted">Validez Oferta</label>
+
                         <select id="inputValidez" class="form-select form-select-sm">
+
                             <option value="5 días">5 días</option>
+
                             <option value="7 días">7 días</option>
+
                             <option value="10 días">10 días</option>
+
                             <option value="15 días">15 días</option>
+
                             <option value="30 días">30 días</option>
+
                         </select>
+
                     </div>
+
                     
+
                     <div class="col-md-12">
+
                         <label class="small fw-bold text-muted">Observaciones Adicionales</label>
+
                         <textarea id="inputObservacion" class="form-control form-control-sm" rows="2" placeholder="Ej: Mercadería puesta en almacén..."></textarea>
+
                     </div>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
+
+
 
     <div class="col-lg-7 col-md-12">
+
         <div class="card shadow-sm h-100 border-0">
+
             <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-2">
-                    <h5 class="mb-0 text-primary fw-light">Detalle de Cotización</h5>
-                    <button class="btn btn-sm btn-warning shadow-sm fw-bold ms-2" onclick="aplicarDescuentoMasivo()" title="Aplicar descuento a todos los ítems">
-                        <i class="bi bi-percent"></i> Masivo
-                    </button>
-                </div>
+
+                <h5 class="mb-0 text-primary fw-light">Detalle de Cotización</h5>
+
                 <span id="badgeTC_Visual" class="badge bg-warning text-dark border border-dark d-none">
+
                     T.C. <span id="lblTC_Visual">0.000</span>
+
                 </span>
+
             </div>
+
                         
+
             <div class="card-body p-0 d-flex flex-column">
+
                 <div class="table-responsive flex-grow-1" style="max-height: 500px; overflow-y: auto;">
+
                     <table class="table table-sm table-hover mb-0 align-middle">
+
                         <thead class="table-light sticky-top small text-muted text-uppercase">
+
                             <tr>
+
                                 <th style="width: 40%;" class="ps-3">Descripción</th>
+
                                 <th class="text-center" style="width: 10%;">U.M.</th> <th class="text-center" style="width: 15%;">Cant.</th>
+
                                 <th class="text-end" style="width: 15%;">P. Unit</th>
+
                                 <th class="text-end" style="width: 15%;">Total</th>
+
                                 <th style="width: 5%;"></th>
+
                             </tr>
+
                         </thead>
+
                         <tbody id="tablaCarrito"></tbody>
+
                     </table>
+
                     <div id="msgVacio" class="text-center text-muted py-5 my-5">
+
                         <i class="bi bi-cart-x display-1 opacity-25"></i>
+
                         <p class="mt-3 small">No hay productos en la lista.</p>
+
                     </div>
+
                 </div>
+
             </div>
+
+
 
             <div class="card-footer bg-white border-top p-3">
+
                 <div class="row justify-content-end">
+
                     <div class="col-md-9 col-12"> <table class="table table-sm table-borderless mb-0 align-middle">
+
                             <tr>
+
                                 <td class="text-end text-muted">Subtotal Inicial:</td>
+
                                 <td class="text-end fw-bold" id="lblSubtotalInicial">0.00</td>
+
                             </tr>
+
+
 
                             <tr class="border-bottom">
+
                                 <td class="text-end">
+
                                     <div class="d-flex justify-content-end align-items-center gap-2">
+
                                         <label class="small text-danger fw-bold me-1">Descuento:</label>
+
                                         <select id="tipoDescuento" class="form-select form-select-sm border-danger text-danger fw-bold" style="width: 70px;" onchange="actualizarTotalesGlobales()">
+
                                             <option value="MONTO">$</option> <option value="PORCENTAJE">%</option>
+
                                         </select>
+
                                         <input type="number" id="inputDescuento" class="form-control form-control-sm border-danger text-end text-danger fw-bold" 
+
                                             value="0" min="0" step="0.01" style="width: 80px;" 
+
                                             onkeydown="return evitarNegativos(event)"
+
                                             oninput="validarInputDescuento(this); actualizarTotalesGlobales()">
+
                                     </div>
+
                                 </td>
+
                                 <td class="text-end fw-bold text-danger" id="lblMontoDescuento">- 0.00</td>
+
                             </tr>
 
+
+
                             <tr>
+
                                 <td class="text-end text-muted small">Valor de Venta (Neto):</td>
+
                                 <td class="text-end fw-bold" id="lblSubtotalNeto">0.00</td>
+
                             </tr>
 
+
+
                             <tr>
+
                                 <td class="text-end text-muted">IGV (18%):</td>
+
                                 <td class="text-end fw-bold" id="lblIGV">0.00</td>
+
                             </tr>
+
+
 
                             <tr class="border-top bg-light">
+
                                 <td class="text-end fs-4 fw-bold text-dark pt-2">TOTAL:</td>
+
                                 <td class="text-end fs-4 fw-bold text-primary pt-2" id="lblTotal">0.00</td>
+
                             </tr>
+
                         </table>
+
                     </div>
+
                 </div>
+
                 <div class="d-grid gap-2 mt-3">
+
                     <button class="btn btn-warning btn-lg fw-bold shadow-sm" onclick="window.previsualizarVenta()">
+
                         <i class="bi bi-save2"></i> GUARDAR COTIZACIÓN
+
                     </button>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
+
+
+
 
 
 <div class="modal fade" id="modalNuevoServicio" tabindex="-1">
+
     <div class="modal-dialog modal-sm modal-dialog-centered">
+
         <div class="modal-content">
+
             <div class="modal-header bg-success text-white py-2">
+
                 <h6 class="modal-title small fw-bold">Nuevo Tipo de Servicio</h6>
+
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
             </div>
+
             <div class="modal-body">
+
                 <label class="small fw-bold text-muted">Nombre del Servicio</label>
+
                 <input type="text" id="inputNombreServicioNuevo" class="form-control form-control-sm text-uppercase mb-2" 
+
                        placeholder="Ej: SERVICIO DE TORNO">
+
                 <div class="alert alert-light border p-2 mb-0 small text-muted">
+
                     <i class="bi bi-info-circle"></i> Se generará un SKU automático (ej: SRV-TORN) y se guardará en el catálogo.
+
                 </div>
+
             </div>
+
             <div class="modal-footer p-1">
+
                 <button type="button" class="btn btn-primary btn-sm w-100" onclick="guardarNuevoServicio()">
+
                     <i class="bi bi-save"></i> GUARDAR
+
                 </button>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
+
+
 
 <div class="modal fade" id="modalResumenVenta" tabindex="-1" data-bs-backdrop="static">
+
     <div class="modal-dialog modal-lg modal-dialog-centered">
+
         <div class="modal-content border-0 shadow-lg">
+
             <div class="modal-header bg-primary text-white">
+
                 <h5 class="modal-title fw-bold"><i class="bi bi-clipboard-check"></i> Revisar Cotización</h5>
+
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
             </div>
+
             <div class="modal-body bg-light">
+
                 <div class="card mb-3 border-0 shadow-sm">
+
                     <div class="card-body py-2">
+
                         <h6 class="text-primary fw-bold border-bottom pb-1 mb-2">Datos del Cliente</h6>
+
                         <div class="row small">
+
                             <div class="col-md-8"><strong>Razón Social:</strong> <span id="res_cliente"></span></div>
+
                             <div class="col-md-4"><strong>RUC/DNI:</strong> <span id="res_ruc"></span></div>
+
                             <div class="col-12 mt-1"><strong>Lugar Entrega:</strong> <span id="res_direccion" class="text-muted"></span></div>
+
                         </div>
+
                     </div>
+
                 </div>
+
+
 
                 <h6 class="text-primary fw-bold border-bottom pb-1 mb-2">Items a Cotizar</h6>
+
                 <div class="table-responsive bg-white rounded border mb-3" style="max-height: 250px; overflow-y: auto;">
+
                     <table class="table table-sm table-striped mb-0 small">
+
                         <thead class="table-light sticky-top">
+
                             <tr>
+
                                 <th>Descripción</th>
+
                                 <th class="text-center">Cant.</th>
+
                                 <th class="text-end">P.Unit</th>
+
                                 <th class="text-end">Total</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody id="tablaResumenBody"></tbody>
+
                     </table>
+
                 </div>
+
+
 
                 <div class="row justify-content-end text-end">
+
                     <div class="col-md-5">
+
                         <div class="d-flex justify-content-between border-bottom px-2">
+
                             <span class="text-muted">Total Neto:</span>
+
                             <strong id="res_neto">0.00</strong>
+
                         </div>
+
                         <div class="d-flex justify-content-between border-bottom px-2">
+
                             <span class="text-muted">IGV (18%):</span>
+
                             <strong id="res_igv">0.00</strong>
+
                         </div>
+
                         <div class="d-flex justify-content-between bg-warning bg-opacity-25 px-2 py-1 rounded mt-1">
+
                             <span class="fw-bold text-dark">TOTAL FINAL:</span>
+
                             <strong class="text-primary fs-5" id="res_total">0.00</strong>
+
                         </div>
+
                     </div>
+
                 </div>
+
             </div>
+
             <div class="modal-footer">
+
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Corregir Datos</button>
+
                 <button type="button" class="btn btn-success fw-bold px-4" onclick="confirmarYGuardar()">
+
                     <i class="bi bi-check-circle-fill"></i> GENERAR COTIZACIÓN
+
                 </button>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
+
+
 
 <div class="modal fade" id="modalGLB" tabindex="-1" data-bs-backdrop="static">
+
     <div class="modal-dialog modal-xl modal-dialog-centered"> <div class="modal-content">
+
             <div class="modal-header bg-primary text-white py-2">
+
                 <h6 class="modal-title fw-bold"><i class="bi bi-layers-half"></i> Configuración de Item Global / Kit / Servicio</h6>
+
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
             </div>
+
             
+
             <div class="modal-body bg-light">
+
                 <div class="row h-100">
+
                     
+
                     <div class="col-lg-5 col-12 d-flex flex-column border-end">
+
                         <h6 class="text-primary fw-bold small mb-3 border-bottom pb-2">1. Definición del Entregable</h6>
+
                         
+
                         <div class="mb-3">
+
                             <label class="small fw-bold text-muted">Título Corto (Saldrá en Negrita)</label>
+
                             <input type="text" id="glbTitulo" class="form-control fw-bold text-uppercase border-primary" 
+
                                    placeholder="Ej: INSERTO BASE TRANSFORMADOR C8 x 11.5">
+
                         </div>
+
+
 
                         <div class="mb-1">
+
                             <label class="small fw-bold text-muted">Descripción Técnica / EETT</label>
+
                             <div class="btn-group btn-group-sm w-100 mb-1" role="group">
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo('Ø')" title="Diámetro">Ø</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo('Φ')" title="Phi Vertical">Φ</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo('@')" title="Arroba">@</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo('½')" title="Un medio">½</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo('¼')" title="Un cuarto">¼</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo('¾')" title="Tres cuartos">¾</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo(String.fromCharCode(34))" title="Pulgadas">"</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo('mm')" title="Milímetros">mm</button>
+
                                 <button type="button" class="btn btn-outline-secondary" onclick="insertarSimbolo(' + ')" title="Más con espacio"> + </button>
+
                             </div>
+
                         </div>
+
+
 
                         <div class="flex-grow-1">
+
                             <textarea id="glbDescripcion" class="form-control small" style="height: 150px; font-family: monospace; font-size: 0.85rem;" 
+
                                       placeholder="Ej: Contiene por juego: 01 canal C 8x11.5 de 3.7 m + 01 plancha..."></textarea>
+
                             <div class="form-text small fst-italic text-end">Use la barra superior para símbolos especiales.</div>
+
                         </div>
+
                     </div>
+
+
 
                     <div class="col-lg-7 col-12 ps-lg-4 mt-3 mt-lg-0">
+
                         <h6 class="text-success fw-bold small mb-3 border-bottom pb-2">2. Composición (Salida de Inventario)</h6>
+
                         
+
                         <div class="card border-0 shadow-sm mb-3">
+
                             <div class="card-body p-2 bg-white rounded">
+
                                 <div class="row g-2">
+
                                     <div class="col-6">
+
                                         <label class="small text-muted mb-0">Familia</label>
+
                                         <select class="form-select form-select-sm" id="filtroFamiliaGLB" onchange="window.cargarCalidadesGLB()">
+
                                             <option value="" selected>-- Buscar Familia --</option>
+
                                             {% for c in categorias %} 
+
                                                 <option value="{{ c.id }}" data-nombre="{{ c.nombre }}">{{ c.nombre }}</option> 
+
                                             {% endfor %}
+
                                         </select>
+
                                     </div>
+
                                     <div class="col-6">
+
                                         <label class="small text-muted mb-0">Calidad</label>
+
                                         <select class="form-select form-select-sm" id="filtroCalidadGLB" disabled onchange="window.cargarProductosGLB()">
+
                                             <option value="">-- Seleccione --</option>
+
                                         </select>
+
                                     </div>
+
                                     <div class="col-12">
+
                                         <label class="small text-muted mb-0">Producto</label>
+
                                         <div class="input-group input-group-sm">
+
                                             <select id="selectHijoGLB" class="form-select" style="width: 70%;">
+
                                                 <option value="">Buscar componente...</option>
+
                                             </select>
+
                                             <input type="number" id="cantHijoGLB" class="form-control text-center fw-bold" value="1" placeholder="Cant" style="width: 15%;">
+
                                             <button class="btn btn-success" onclick="agregarHijoGLB()"><i class="bi bi-plus-lg"></i></button>
+
                                         </div>
+
                                     </div>
+
                                 </div>
+
                             </div>
+
                         </div>
+
+
 
                         <div class="border rounded bg-white p-0" style="height: 200px; overflow-y: auto;">
+
                             <table class="table table-sm table-striped mb-0 small align-middle">
+
                                 <thead class="table-light sticky-top">
+
                                     <tr>
+
                                         <th class="ps-2">Componente Seleccionado</th>
+
                                         <th class="text-center" style="width: 80px;">Cant.</th>
+
                                         <th style="width: 40px;"></th>
+
                                     </tr>
+
                                 </thead>
+
                                 <tbody id="listaHijosGLB">
+
                                     </tbody>
+
                             </table>
+
                         </div>
+
                         <div class="text-end mt-1">
+
                             <small class="text-muted" id="conteoComponentes">0 items agregados</small>
+
                         </div>
+
                     </div>
+
                 </div>
+
             </div>
+
             
+
             <div class="modal-footer py-2 bg-light">
+
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+
                 <button type="button" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" onclick="guardarConfigGLB()">
+
                     <i class="bi bi-check-circle-fill"></i> CONFIRMAR CONFIGURACIÓN
+
                 </button>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
+
+
 
 <div class="modal fade" id="modalDirectorio" tabindex="-1" aria-hidden="true">
+
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
+
         <div class="modal-content">
+
             <div class="modal-header bg-primary text-white py-2">
+
                 <h6 class="modal-title fw-bold"><i class="bi bi-people-fill"></i> Directorio de Clientes Guardados</h6>
+
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+
             </div>
+
             <div class="modal-body">
+
                 <div class="input-group mb-3 sticky-top" style="top: -16px; background: white; padding-top: 10px; z-index: 10;">
+
                     <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+
                     <input type="text" id="filtroDirectorio" class="form-control" placeholder="Filtrar por Nombre o RUC..." onkeyup="filtrarTablaClientes()">
+
                 </div>
+
+
 
                 <div class="table-responsive">
+
                     <table class="table table-sm table-hover table-striped align-middle" id="tablaClientes">
+
                         <thead class="table-light text-muted small text-uppercase">
+
                             <tr>
+
                                 <th style="width: 15%;">RUC/DNI</th>
+
                                 <th style="width: 40%;">Razón Social</th> <th style="width: 10%;" class="d-none d-md-table-cell">Estado</th>
+
                                 <th style="width: 20%;">Última Act.</th>
+
                                 <th style="width: 15%;" class="text-end">Acción</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody id="bodyDirectorio">
+
                             <tr><td colspan="5" class="text-center text-muted py-3">Cargando...</td></tr>
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
 
-<script>
-    // --- VARIABLES GLOBALES ---
-    let carrito = [];
-    let stockActualSeleccionado = 0; 
-    let modoActual = 'PRODUCTO'; 
-    let glbTempData = null; 
-    let componentesGLB = []; 
-    let monedaAnterior = 'USD'; 
 
-    // --- 1. FUNCIONES DE DESCUENTO POR ITEM Y MASIVO ---
-    window.actualizarFilaManual = function(index, valor) {
-        let val = parseFloat(valor);
-        if (isNaN(val) || val < 0) val = 0;
-        let item = carrito[index];
-        item.precio = val;
-        // Si escribe manualmente, borramos el descuento visual para no confundir
-        item.desc_tipo = ''; item.desc_valor = 0; item.desc_label = '';
-        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
-        renderizarTabla(); 
-    };
+
+<script>
+
+    // --- VARIABLES GLOBALES ---
+
+    let carrito = [];
+
+    let stockActualSeleccionado = 0; 
+
+    let modoActual = 'PRODUCTO'; 
+
+    let glbTempData = null; 
+
+    let componentesGLB = []; 
+
+    let monedaAnterior = 'USD'; // Variable para recordar estado anterior si cancela}
+
+
+
+
 
     window.aplicarDescuentoItem = function(index) {
+
         let item = carrito[index];
+
         let moneda = $('#selectMoneda').val();
+
         let simbolo = moneda === 'PEN' ? 'S/' : '$';
 
+
+
         Swal.fire({
-            title: 'Descuento al Producto',
+
+            title: 'Descuento Especial',
+
             html: `
+
                 <div class="text-start small text-muted mb-2">${item.nombre}</div>
+
                 <select id="swal-desc-tipo" class="form-select mb-2">
+
                     <option value="%">Porcentaje (%)</option>
-                    <option value="MONTO">Monto Directo c/u (${simbolo})</option>
+
+                    <option value="MONTO">Monto Directo (${simbolo})</option>
+
                 </select>
+
                 <input id="swal-desc-valor" type="number" class="form-control" placeholder="Ej: 10" min="0" step="any">
+
             `,
+
             showCancelButton: true,
+
             confirmButtonText: 'Aplicar',
+
             cancelButtonText: 'Quitar Descuento',
+
             confirmButtonColor: '#198754',
+
         }).then(res => {
+
             let tc = parseFloat($('#inputTC').val()) || 1;
+
             let precioRealSinDesc = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
 
+
+
             if (res.isConfirmed) {
+
                 let tipo = document.getElementById('swal-desc-tipo').value;
+
                 let valor = parseFloat(document.getElementById('swal-desc-valor').value) || 0;
 
+
+
                 if (valor > 0) {
-                    if (tipo === 'MONTO' && valor >= precioRealSinDesc) {
-                        return Swal.fire('Error', `El descuento (${simbolo}${valor}) no puede ser mayor o igual al precio original (${simbolo}${precioRealSinDesc.toFixed(2)}).`, 'error');
-                    }
-                    item.desc_tipo = tipo; item.desc_valor = valor;
+
+                    item.desc_tipo = tipo;
+
+                    item.desc_valor = valor;
+
+
+
                     if (tipo === '%') {
-                        if (valor >= 100) return Swal.fire('Error', 'No puede descontar el 100%.', 'error');
+
                         item.precio = precioRealSinDesc * (1 - (valor / 100));
-                        item.desc_label = `Desc: -${valor}%`;
+
+                        item.desc_label = `Descuento: -${valor}%`;
+
                     } else {
+
                         item.precio = precioRealSinDesc - valor;
-                        item.desc_label = `Desc: -${simbolo}${valor} c/u`;
+
+                        if (item.precio < 0) item.precio = 0;
+
+                        item.desc_label = `Descuento: -${simbolo}${valor}`;
+
                     }
+
                 }
+
             } else if (res.dismiss === Swal.DismissReason.cancel) {
-                item.desc_tipo = ''; item.desc_valor = 0; item.desc_label = '';
+
+                // Botón Quitar Descuento
+
+                item.desc_tipo = '';
+
+                item.desc_valor = 0;
+
+                item.desc_label = '';
+
                 item.precio = precioRealSinDesc;
+
             }
+
+
+
+            // Recalculamos el subtotal de la fila y actualizamos la tabla
+
             item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+
             renderizarTabla();
+
         });
+
     };
 
-    window.aplicarDescuentoMasivo = function() {
-        if (carrito.length === 0) return Swal.fire('Carrito Vacío', 'Agregue productos primero.', 'warning');
-        let moneda = $('#selectMoneda').val();
-        let simbolo = moneda === 'PEN' ? 'S/' : '$';
 
-        Swal.fire({
-            title: 'Descuento a Toda la Lista',
-            html: `
-                <div class="text-start small text-muted mb-2">Aplica a cada unidad de todos los productos:</div>
-                <select id="swal-desc-tipo-masivo" class="form-select mb-2">
-                    <option value="%">Porcentaje (%)</option>
-                    <option value="MONTO">Monto Directo c/u (${simbolo})</option>
-                </select>
-                <input id="swal-desc-valor-masivo" type="number" class="form-control border-warning" placeholder="Ej: 5" min="0" step="any">
-                <div class="form-text small mt-2 text-danger"><i class="bi bi-exclamation-circle"></i> Sobreescribirá descuentos previos.</div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: 'Aplicar a Todos',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#ffc107',
-        }).then(res => {
-            if (res.isConfirmed) {
-                let tipo = document.getElementById('swal-desc-tipo-masivo').value;
-                let valor = parseFloat(document.getElementById('swal-desc-valor-masivo').value) || 0;
-                let tc = parseFloat($('#inputTC').val()) || 1;
-                
-                if (valor > 0) {
-                    carrito.forEach(item => {
-                        let precioRealSinDesc = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
-                        if (tipo === 'MONTO' && valor >= precioRealSinDesc) {
-                            item.precio = 0.01; item.desc_tipo = 'MONTO'; item.desc_valor = (precioRealSinDesc - 0.01);
-                            item.desc_label = `Límite alcanzado`;
-                        } else if (tipo === '%' && valor >= 100) {
-                            item.precio = 0.01; item.desc_tipo = '%'; item.desc_valor = 99.9;
-                            item.desc_label = `Límite alcanzado`;
-                        } else {
-                            item.desc_tipo = tipo; item.desc_valor = valor;
-                            if (tipo === '%') {
-                                item.precio = precioRealSinDesc * (1 - (valor / 100));
-                                item.desc_label = `Desc Masivo: -${valor}%`;
-                            } else {
-                                item.precio = precioRealSinDesc - valor;
-                                item.desc_label = `Desc Masivo: -${simbolo}${valor} c/u`;
-                            }
-                        }
-                        item.precio = parseFloat(item.precio.toFixed(6));
-                        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
-                    });
-                    renderizarTabla();
-                    Swal.fire({toast:true, position:'top-end', icon:'success', title:'Descuento Masivo Aplicado', showConfirmButton:false, timer:2000});
-                }
-            }
-        });
-    };
 
-    // --- 2. INICIALIZADOR PRINCIPAL ---
     document.addEventListener('DOMContentLoaded',  () => { 
+
         const modales = document.querySelectorAll('.modal');
+
         modales.forEach(m => m.removeAttribute('tabindex'));
+
         document.body.addEventListener('shown.bs.modal', function (event) { event.target.removeAttribute('tabindex'); });
+
         
+
+        // Exponer funciones al window
+
         window.iniciarCambioMoneda = iniciarCambioMoneda;
+
         window.actualizarDolar = actualizarDolar;
+
         window.buscarClienteApi = buscarClienteApi;
+
         window.confirmarForzado = confirmarForzado;
+
         window.guardarSoloCliente = guardarSoloCliente;
+
         window.cargarCalidadesVenta = cargarCalidadesVenta;
+
         window.cargarProductos = cargarProductos;
+
         window.recalcularCarritoPorMoneda = recalcularCarritoPorMoneda;
+
         window.actualizarFila = actualizarFila;
+
         window.eliminarFila = eliminarFila;
+
         window.guardarVenta = guardarVenta;
+
         window.filtroTeclas = filtroTeclas;
+
         window.validarEntradaString = validarEntradaString;
+
         window.limpiarInputCantidad = limpiarInputCantidad;
+
         window.limpiarInputPrecio = limpiarInputPrecio;
+
         window.actualizarFilaSinRedibujar = actualizarFilaSinRedibujar;
+
+        
+
         window.cambiarModo = cambiarModo;
+
         window.abrirModalGLB = abrirModalGLB;
+
         window.agregarHijoGLB = agregarHijoGLB;
+
         window.guardarConfigGLB = guardarConfigGLB;
+
         window.cargarCalidadesGLB = cargarCalidadesGLB;
+
         window.cargarProductosGLB = cargarProductosGLB;
+
         window.verComponentes = verComponentes; 
+
+        
+
+        // NUEVAS FUNCIONES
+
         window.toggleDireccionEntrega = toggleDireccionEntrega;
+
         window.verFichaCliente = verFichaCliente;
+
+
+
         window.previsualizarVenta = previsualizarVenta;
+
         window.confirmarYGuardar = confirmarYGuardar;
+
         window.actualizarTotalesGlobales = actualizarTotalesGlobales;
 
+
+
         recalcularCarritoPorMoneda(); 
+
         inicializarSelect2Cliente(); 
+
         inicializarSelect2GLB(); 
+
+
+
         cargarListaServicios();
 
+
+
         {% if modo_edicion %}
+
         console.log("Modo Edición Activado");
+
+        
+
+        // 1. Recuperar datos inyectados por Flask
+
         const datosPreCargados = {{ items_json | tojson }}; 
+
         const datosCliente = {
+
             ruc: "{{ orden.cliente.documento }}",
+
             nombre: "{{ orden.cliente.nombre }}",
+
             dir: "{{ orden.direccion_envio or orden.cliente.direccion }}", 
+
             tel: "{{ orden.cliente.telefono or '' }}",
+
             atte: "{{ orden.atencion or '' }}",
+
             oc: "{{ orden.orden_compra or '' }}",
+
             tipo_entrega: "{{ orden.tipo_entrega }}",
+
             fecha: "{{ orden.fecha_entrega.strftime('%Y-%m-%d') if orden.fecha_entrega else '' }}",
+
             condicion: "{{ orden.condicion_pago }}",
+
             validez: "{{ orden.validez_oferta }}",
+
             obs: `{{ orden.observacion or '' }}` 
+
         };
+
         const datosFinancieros = {
+
             moneda: "{{ orden.moneda }}",
+
             desc_tipo: "{{ orden.descuento_tipo }}",
+
             desc_valor: {{ orden.descuento_valor }}
+
         };
+
+
+
+        // 2. LLENAR DATOS DEL CLIENTE
 
         var newOption = new Option(datosCliente.ruc + " - " + datosCliente.nombre, datosCliente.ruc, true, true);
+
         $('#cli_doc_select').append(newOption).trigger('change');
+
         
+
         $('#cli_nom').val(datosCliente.nombre);
+
         $('#cli_dir').val(datosCliente.dir); 
+
         $('#cli_tel').val(datosCliente.tel);
+
         $('#cli_atte').val(datosCliente.atte);
+
         $('#cli_oc').val(datosCliente.oc);
+
+
+
+        // 3. LLENAR DATOS LOGÍSTICOS
+
         $('#inputFechaEntrega').val(datosCliente.fecha);
+
         $('#selectEntrega').val(datosCliente.tipo_entrega);
+
         if(datosCliente.tipo_entrega === 'Envio'){
+
             $('#divDireccionEntrega').show(); 
+
             $('#inputDireccionEntrega').val(datosCliente.dir);
+
         }
-        $('#inputCondicionPago').val(datosCliente.condicion);
-        $('#inputValidez').val(datosCliente.validez);
-        $('#inputObservacion').val(datosCliente.obs);
-        $('#selectMoneda').val(datosFinancieros.moneda);
-        $('#tipoDescuento').val(datosFinancieros.desc_tipo);
-        $('#inputDescuento').val(datosFinancieros.desc_valor);
+
         
+
+        // 4. LLENAR DATOS COMERCIALES
+
+        $('#inputCondicionPago').val(datosCliente.condicion);
+
+        $('#inputValidez').val(datosCliente.validez);
+
+        $('#inputObservacion').val(datosCliente.obs);
+
+
+
+        // 5. CARGAR MONEDA Y DESCUENTO
+
+        $('#selectMoneda').val(datosFinancieros.moneda);
+
+        $('#tipoDescuento').val(datosFinancieros.desc_tipo);
+
+        $('#inputDescuento').val(datosFinancieros.desc_valor);
+
+        
+
         let simbolo = (datosFinancieros.moneda === 'PEN') ? 'S/' : '$';
+
         $('#simboloMonedaInput').text(simbolo); 
+
         $('#lblMonedaUnit').text(datosFinancieros.moneda); 
 
-        // Rellenar carrito asegurando que las variables de descuento existan en los antiguos
-        carrito = datosPreCargados.map(i => ({...i, desc_tipo: '', desc_valor: 0, desc_label: ''}));
+
+
+        // 6. CARGAR EL CARRITO (GLOBAL)
+
+        carrito = datosPreCargados;
+
         renderizarTabla(); 
+
         
+
+        // 7. CAMBIAR EL BOTÓN A "GUARDAR CAMBIOS"
+
         const btnGuardar = document.querySelector('button[onclick="window.previsualizarVenta()"]');
+
         if(btnGuardar) {
+
             btnGuardar.innerHTML = '<i class="bi bi-save"></i> GUARDAR CAMBIOS';
+
             btnGuardar.className = 'btn btn-primary btn-lg fw-bold shadow-sm';
+
         }
+
+        
+
         {% endif %}
+
+
+
     });
 
-    // --- 3. FUNCIONES DE MONEDA ---
-    function iniciarCambioMoneda(selectElement) {
+
+
+
+
+    window.iniciarCambioMoneda = function(selectElement) {
+
         const nuevaMoneda = selectElement.value;
-        const tcSunat = parseFloat($('#inputTC').val()) || 1; 
+
+        const tcSunat = parseFloat($('#inputTC').val()) || 1; // Toma el valor del input READONLY
+
         
+
+        // A. SI EL CARRITO ESTÁ VACÍO (Solo cambio visual)
+
         if (carrito.length === 0) {
+
             actualizarSimbolosVisuales(nuevaMoneda);
+
             monedaAnterior = nuevaMoneda;
+
+            // Manejo del Badge Amarillo
+
             if (nuevaMoneda === 'PEN') actualizarBadgeVisualTC(tcSunat);
+
             else actualizarBadgeVisualTC(null);
+
             return;
+
         }
+
+
+
+        // B. CAMBIO A DÓLARES (Restaurar)
 
         if (nuevaMoneda === 'USD') {
+
             aplicarCambioMonedaReal('USD', 1);
+
             monedaAnterior = 'USD';
+
             return;
+
         }
 
-        if (nuevaMoneda === 'PEN') {
-            Swal.fire({
-                title: 'Convirtiendo a Soles',
-                text: `Se aplicará el T.C. SUNAT: ${tcSunat.toFixed(3)}`,
-                icon: 'info',
-                timer: 2000,
-                showConfirmButton: false,
-                backdrop: `rgba(0,0,123,0.1)` 
-            });
-            aplicarCambioMonedaReal('PEN', tcSunat);
-            monedaAnterior = 'PEN';
-        }
-    }
+
 
     function aplicarCambioMonedaReal(moneda, factorTC) {
+
+        // Actualizar visuales
+
         actualizarSimbolosVisuales(moneda);
+
+
+
+        // Actualizar datos del array
+
         carrito.forEach(item => { 
-            let precio_puro = (moneda === 'PEN') ? (item.precioBase * factorTC) : item.precioBase;
-            if (item.desc_valor > 0) {
-                if (item.desc_tipo === '%') {
-                    item.precio = precio_puro * (1 - (item.desc_valor / 100));
-                } else {
-                    let desc_monto_base = (moneda === 'PEN') ? (item.desc_valor * factorTC) : (item.desc_valor / factorTC); 
-                    item.precio = precio_puro - desc_monto_base;
-                    if (item.precio < 0) item.precio = 0;
-                }
+
+            if(moneda === 'PEN') {
+
+                // Multiplicamos el Precio Base (USD) por el TC
+
+                item.precio = parseFloat((item.precioBase * factorTC).toFixed(6)); 
+
             } else {
-                item.precio = precio_puro;
+
+                // Restauramos el Precio Base original
+
+                item.precio = item.precioBase; 
+
             }
-            item.precio = parseFloat(item.precio.toFixed(6));
+
+            // Recalculamos subtotal
+
             item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100; 
+
         });
+
+
+
+        // Redibujar tabla y mostrar Badge Amarillo si es Soles
+
         renderizarTabla();
+
+        
+
         if (moneda === 'PEN') actualizarBadgeVisualTC(factorTC);
+
         else actualizarBadgeVisualTC(null);
+
     }
 
-    function recalcularCarritoPorMoneda() {
-        let moneda = $('#selectMoneda').val(); 
-        let tc = parseFloat($('#inputTC').val()) || 1;
-        let simbolo = moneda === 'PEN' ? 'S/' : '$';
 
-        $('#simboloMonedaInput').text(simbolo); 
-        $('#lblMonedaUnit').text(moneda);  
-        $('#tipoDescuento option[value="MONTO"]').text(simbolo); 
-        calcularPrecioUnitarioVisual();
-        
-        if(carrito.length > 0) {
-            Swal.fire({ title: 'Cambio de Moneda', text: 'Se recalcularán los precios y descuentos.', icon: 'warning', showCancelButton: true }).then((r) => {
-                if(r.isConfirmed) { 
-                    aplicarCambioMonedaReal(moneda, tc);
-                    monedaAnterior = moneda;
-                } else {
-                    $('#selectMoneda').val(monedaAnterior);
-                    actualizarSimbolosVisuales(monedaAnterior);
-                }
+
+        // C. CAMBIO A SOLES (Automático con aviso)
+
+        if (nuevaMoneda === 'PEN') {
+
+            // Pequeña confirmación visual (Toast) o Ventana informativa
+
+            Swal.fire({
+
+                title: 'Convirtiendo a Soles',
+
+                text: `Se aplicará el T.C. SUNAT: ${tcSunat.toFixed(3)}`,
+
+                icon: 'info',
+
+                timer: 2000,
+
+                showConfirmButton: false,
+
+                backdrop: `rgba(0,0,123,0.1)` // Fondo suave
+
             });
+
+            
+
+            aplicarCambioMonedaReal('PEN', tcSunat);
+
+            monedaAnterior = 'PEN';
+
         }
-        actualizarTotalesGlobales();
+
     }
 
-    function actualizarDolar(forzar = false) {
-        const btn = document.querySelector('button[title="Consultar SUNAT"]'); if(btn) btn.disabled = true;
-        fetch('/api/tipo_cambio_actual?force=' + (forzar ? 'true' : 'false')).then(r => r.json()).then(data => {
-            if(!forzar && data.es_de_hoy) { Swal.fire({ title: 'Dato Actualizado', icon: 'info', showCancelButton: true, confirmButtonText: 'Forzar' }).then(r => { if(r.isConfirmed) actualizarDolar(true); }); return; }
-            $('#inputTC').val(data.tc.toFixed(3)); $('#msgTC').text(`Act: ${data.updated_at}`); recalcularCarritoPorMoneda(); if(btn) btn.disabled = false;
-        });
-    }
 
-    function actualizarSimbolosVisuales(moneda) {
-        let simbolo = moneda === 'PEN' ? 'S/' : '$';
-        $('#simboloMonedaInput').text(simbolo); 
-        $('#lblMonedaUnit').text(moneda); 
-        $('#tipoDescuento option[value="MONTO"]').text(simbolo);
-        calcularPrecioUnitarioVisual(); 
-    }
 
-    function actualizarBadgeVisualTC(tcValor) {
-        const badge = $('#badgeTC_Visual');
-        const lbl = $('#lblTC_Visual');
-        if (tcValor !== null && tcValor > 0) {
-            lbl.text(parseFloat(tcValor).toFixed(3));
-            badge.removeClass('d-none'); 
-        } else {
-            badge.addClass('d-none');
-        }
-    }
+    function pedirTCManual(tcSugerido) {
 
-    // --- 4. FUNCIONES DE CLIENTE Y SUNAT ---
-    function buscarClienteApi(force = false) {
-        let numero = $('#cli_doc_select').val(); 
-        if(!numero) return Swal.fire('Error', 'Escriba un número', 'warning');
-        
-        const btn = document.getElementById('btnBuscarSunat'); 
-        const iconoOriginal = btn.innerHTML; 
-        btn.disabled = true; 
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        
-        let formData = new FormData(); 
-        formData.append('numero', numero); 
-        if(force) formData.append('force', 'true');
-        
-        fetch('/api/consulta_documento', { method: 'POST', body: formData })
-        .then(r => r.json()).then(data => {
-            btn.disabled = false; btn.innerHTML = iconoOriginal;
-            if(data.status === 'success') {
-                $('#cli_nom').val(data.razon_social).prop('readonly', true); 
-                $('#cli_dir').val(data.direccion || '').prop('readonly', true);
-                $('#inputDireccionEntrega').val(data.direccion || '');
-                if(data.telefono) $('#cli_tel').val(data.telefono);
-                
-                $('#hidden_estado').val(data.estado);
-                $('#hidden_condicion').val(data.condicion);
-                actualizarBadges(data.estado, data.condicion); 
-                
-                let infoAudit = `Act: ${data.last_updated} (${data.updated_by})`;
-                let iconFuente = data.origen === 'BD' ? '<i class="bi bi-database"></i> BD Local' : '<i class="bi bi-cloud-download"></i> SUNAT';
-                $('#lbl_origen_datos').html(`${iconFuente} | <span class="text-primary">${infoAudit}</span>`);
-            } else { 
-                Swal.fire('Aviso', data.msg, 'warning'); 
+        Swal.fire({
+
+            title: 'T.C. Manual',
+
+            input: 'number',
+
+            inputLabel: 'Ingrese el tipo de cambio venta:',
+
+            inputValue: tcSugerido,
+
+            inputAttributes: {
+
+                step: '0.001',
+
+                min: '0'
+
+            },
+
+            showCancelButton: true,
+
+            confirmButtonText: 'Aplicar',
+
+            preConfirm: (valor) => {
+
+                if (!valor || parseFloat(valor) <= 0) {
+
+                    Swal.showValidationMessage('Ingrese un valor válido mayor a 0');
+
+                }
+
+                return parseFloat(valor);
+
             }
-        }).catch(err => { 
-            console.error(err); 
-            btn.disabled = false; btn.innerHTML = iconoOriginal; 
-            Swal.fire('Error', 'Fallo de conexión', 'error'); 
+
+        }).then((res) => {
+
+            if (res.isConfirmed) {
+
+                const nuevoTC = res.value;
+
+                // Actualizamos el input visual del TC en la cabecera
+
+                $('#inputTC').val(nuevoTC.toFixed(3));
+
+                // Marcamos que fue manual en el texto de origen
+
+                $('#msgTC').text('Manual por usuario');
+
+                
+
+                monedaAnterior = 'PEN';
+
+                aplicarCambioMoneda('PEN', nuevoTC);
+
+            } else {
+
+                // Canceló manual, volver select a USD (o anterior)
+
+                $('#selectMoneda').val(monedaAnterior);
+
+            }
+
         });
+
     }
+
+
+
+    function aplicarCambioMoneda(moneda, factorTC) {
+
+        // Actualizamos labels visuales
+
+        let simbolo = moneda === 'PEN' ? 'S/' : '$';
+
+        $('#simboloMonedaInput').text(simbolo); 
+
+        $('#lblMonedaUnit').text(moneda); 
+
+        $('#tipoDescuento option[value="MONTO"]').text(simbolo);
+
+
+
+        // Actualizamos los precios del carrito
+
+        if (carrito.length > 0) {
+
+            carrito.forEach(item => { 
+
+                if(moneda === 'PEN') {
+
+                    // De Base (USD) a Soles: Multiplicar
+
+                    // Usamos 6 decimales internos para precisión, visualmente se verá 2
+
+                    item.precio = parseFloat((item.precioBase * factorTC).toFixed(6)); 
+
+                } else {
+
+                    // Volver a Dólares (Precio Base original)
+
+                    item.precio = item.precioBase; 
+
+                }
+
+                // Recalcular subtotal
+
+                item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100; 
+
+            }); 
+
+            renderizarTabla(); // Aquí sí redibujamos todo porque cambiaron todos los precios
+
+            
+
+            Swal.fire({
+
+                icon: 'success',
+
+                title: `Precios convertidos a ${moneda}`,
+
+                text: `T.C. aplicado: ${factorTC.toFixed(3)}`,
+
+                timer: 1500,
+
+                showConfirmButton: false
+
+            });
+
+        }
+
+        
+
+        // Actualizamos el input manual de precio unitario arriba si hay algo escrito
+
+        calcularPrecioUnitarioVisual();
+
+        actualizarBadgeVisualTC();
+
+    }
+
+
+
+    // --- NUEVA LÓGICA: MOSTRAR/OCULTAR DIRECCIÓN DE ENTREGA ---
+
+    function toggleDireccionEntrega() {
+
+        const tipo = document.getElementById('selectEntrega').value;
+
+        const divDir = document.getElementById('divDireccionEntrega');
+
+        
+
+        if (tipo === 'Envio') {
+
+            $(divDir).slideDown(); // Animación suave
+
+            // Intentar llenar con la dirección fiscal si está vacía
+
+            const dirFiscal = document.getElementById('cli_dir').value;
+
+            const dirActual = document.getElementById('inputDireccionEntrega').value;
+
+            if(dirFiscal && !dirActual) {
+
+                document.getElementById('inputDireccionEntrega').value = dirFiscal;
+
+            }
+
+        } else {
+
+            $(divDir).slideUp();
+
+        }
+
+    }
+
+
+
+    // --- NUEVA LÓGICA: VER FICHA COMPLETA (MODAL/SWAL) ---
+
+    function verFichaCliente() {
+
+        const ruc = $('#cli_doc_select').val();
+
+        if(!ruc) return Swal.fire('Sin Datos', 'Busque un cliente primero.', 'info');
+
+
+
+        const nom = $('#cli_nom').val();
+
+        const dir = $('#cli_dir').val();
+
+        const tel = $('#cli_tel').val();
+
+        const est = $('#hidden_estado').val() || '-';
+
+        const con = $('#hidden_condicion').val() || '-';
+
+
+
+        let html = `
+
+            <div style="text-align: left; font-size: 0.9rem;">
+
+                <p><strong>RUC/DNI:</strong> ${ruc}</p>
+
+                <p><strong>Nombre:</strong> ${nom}</p>
+
+                <p><strong>Dirección:</strong> ${dir}</p>
+
+                <p><strong>Teléfono:</strong> ${tel}</p>
+
+                <hr>
+
+                <p><strong>Estado SUNAT:</strong> <span class="badge bg-${est === 'ACTIVO' ? 'success' : 'danger'}">${est}</span></p>
+
+                <p><strong>Condición:</strong> <span class="badge bg-${con === 'HABIDO' ? 'success' : 'warning'}">${con}</span></p>
+
+            </div>
+
+        `;
+
+
+
+        Swal.fire({
+
+            title: 'Ficha del Cliente',
+
+            html: html,
+
+            icon: 'info',
+
+            confirmButtonText: 'Cerrar'
+
+        });
+
+    }
+
+
+
+    // --- LÓGICA MODAL GLB Y CARGA DE PRODUCTOS (Se mantiene igual, resumida para no afectar) ---
+
+    function cargarCalidadesGLB() {
+
+        const famNombre = $('#filtroFamiliaGLB option:selected').data('nombre');
+
+        const selCal = document.getElementById('filtroCalidadGLB'); 
+
+        selCal.innerHTML = '<option>Cargando...</option>'; selCal.disabled = true; $('#selectHijoGLB').empty();
+
+        if(!famNombre) { selCal.innerHTML = '<option value="">-- Espere familia --</option>'; return; }
+
+        let fd = new FormData(); fd.append('familia', famNombre);
+
+        fetch('/api/calidades_de_familia', { method: 'POST', body: fd }).then(r => r.json()).then(data => {
+
+            selCal.innerHTML = '<option value="">-- Todas --</option>';
+
+            if(data.status === 'success') { data.calidades.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.text = c; selCal.appendChild(opt); }); selCal.disabled = false; }
+
+            cargarProductosGLB(); 
+
+        });
+
+    }
+
+
+
+    function cargarProductosGLB() {
+
+        const catId = $('#filtroFamiliaGLB').val(); 
+
+        const calFiltro = $('#filtroCalidadGLB').val();
+
+        const select = $('#selectHijoGLB'); select.empty().append(new Option('Cargando...', '', false, false));
+
+        let url = catId ? `/api/productos_por_categoria/${catId}` : `/api/productos_por_categoria/0`; 
+
+        fetch(url).then(r => r.json()).then(data => {
+
+            select.empty().append(new Option('', '', true, true)); 
+
+            let lista = data.productos; 
+
+            if(calFiltro && calFiltro !== "") lista = lista.filter(p => p.calidad === calFiltro);
+
+            if(lista.length === 0) select.empty().append(new Option('-- No hay productos --', '', false, false));
+
+            else lista.forEach(p => { const o = new Option(p.nombre, p.id, false, false); $(o).attr({ 'data-sku': p.sku, 'data-stock': p.stock }); select.append(o); });
+
+            select.val(null).trigger('change');
+
+        });
+
+    }
+
+
+
+    // --- MODOS Y LOGICA DE BOTONES ---
+
+    function cambiarModo(modo) {
+
+        modoActual = modo;
+
+        $('#panelProducto').addClass('d-none'); $('#panelFabricacion').addClass('d-none'); $('#panelGLB').addClass('d-none');
+
+        $('#precioManualInput').prop('readonly', false); $('#info_stock').val(''); 
+
+        document.getElementById('btnAgregar').disabled = (modo === 'PRODUCTO' && !$('#productoSelect').val());
+
+        if(modo === 'PRODUCTO') { $('#panelProducto').removeClass('d-none'); if($('#productoSelect').val()) { $('#info_stock').val(stockActualSeleccionado); document.getElementById('btnAgregar').disabled = false; } } 
+
+        else if (modo === 'FABRICACION') { $('#panelFabricacion').removeClass('d-none'); $('#info_stock').val('N/A'); document.getElementById('btnAgregar').disabled = false; } 
+
+        else if (modo === 'GLB') { $('#panelGLB').removeClass('d-none'); $('#info_stock').val('ARMADO'); document.getElementById('btnAgregar').disabled = false; }
+
+        calcularSubtotalPrevio();
+
+    }
+
+
+
+    function inicializarSelect2GLB() {
+
+        // SELECT2 PARA LA FAMILIA (Nuevo)
+
+        $('#filtroFamiliaGLB').select2({
+
+            dropdownParent: $('#modalGLB'),
+
+            placeholder: "Escriba para buscar familia...",
+
+            allowClear: true,
+
+            width: '100%'
+
+        });
+
+
+
+        // SELECT2 PARA EL PRODUCTO HIJO (Ya existía, lo mantenemos)
+
+        $('#selectHijoGLB').select2({
+
+            dropdownParent: $('#modalGLB'), 
+
+            placeholder: "Buscar componente...",
+
+            allowClear: true,
+
+            width: 'style', // Ajuste para que respete el CSS
+
+            templateResult: function (d) { if (!d.id) return d.text; return $(`<div class="small d-flex justify-content-between"><span>${d.text}</span><span class="text-success fw-bold">Stk: ${$(d.element).data('stock')}</span></div>`); },
+
+            matcher: (params, data) => { if ($.trim(params.term) === '') return data; return (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) ? data : null; }
+
+        });
+
+    }
+
+
+
+    function abrirModalGLB() {
+
+        componentesGLB = []; $('#listaHijosGLB').empty(); $('#glbNombre').val("");
+
+        $('#filtroFamiliaGLB').val(""); $('#filtroCalidadGLB').html('<option value="">-- 2. Calidad --</option>').prop('disabled', true);
+
+        $('#selectHijoGLB').empty().append('<option value="">3. Buscar componente...</option>');
+
+        new bootstrap.Modal(document.getElementById('modalGLB')).show();
+
+    }
+
+
+
+    function agregarHijoGLB() {
+
+        const data = $('#selectHijoGLB').select2('data')[0];
+
+        const qty = parseInt($('#cantHijoGLB').val()) || 1;
+
+        
+
+        if(!data || !data.id) return;
+
+
+
+        // IMPORTANTE: Ahora guardamos el 'stock' real del componente
+
+        // data.element.dataset.stock viene del renderizado del select2
+
+        const stockReal = parseInt($(data.element).data('stock')) || 0;
+
+
+
+        componentesGLB.push({ 
+
+            id: data.id, 
+
+            nombre: data.text, 
+
+            qty: qty,
+
+            stock_individual: stockReal // <--- NUEVO CAMPO
+
+        });
+
+        
+
+        renderizarTablaHijosGLB();
+
+        $('#selectHijoGLB').val(null).trigger('change');
+
+        $('#cantHijoGLB').val(1);
+
+    }
+
+
+
+    function guardarConfigGLB() {
+
+        // Obtenemos los valores por separado
+
+        const titulo = document.getElementById('glbTitulo').value.trim(); // ESTO SERÁ NEGRITA
+
+        const desc = document.getElementById('glbDescripcion').value.trim(); // ESTO SERÁ NORMAL
+
+        
+
+        // Validación: Al menos uno debe tener texto
+
+        if(!titulo && !desc) return Swal.fire('Vacío', 'Ingrese al menos un título o descripción.', 'warning');
+
+        if(componentesGLB.length === 0) return Swal.fire('Vacío', 'Agregue al menos un componente al kit.', 'warning');
+
+        
+
+        // Guardamos la estructura separada
+
+        glbTempData = { 
+
+            titulo: titulo,         // Guardamos puro
+
+            descripcion: desc,      // Guardamos puro
+
+            componentes: [...componentesGLB] 
+
+        };
+
+        
+
+        // Actualizamos el preview (Visualmente limpio)
+
+        let htmlPreview = `<div class="text-start ps-3 border-start border-4 border-success bg-white p-2 small">`;
+
+        if(titulo) htmlPreview += `<strong>${titulo}</strong> `; // Espacio después del título
+
+        if(desc) htmlPreview += `<span>${desc}</span>`;
+
+        htmlPreview += `<br><span class="badge bg-secondary mt-1">${componentesGLB.length} componentes</span></div>`;
+
+
+
+        document.getElementById('glbPreview').innerHTML = htmlPreview;
+
+        document.getElementById('glbPreview').className = "mt-2"; // Quitamos estilos viejos
+
+        
+
+        bootstrap.Modal.getInstance(document.getElementById('modalGLB')).hide();
+
+    }
+
+
+
+    window.eliminarHijoGLB = function(index) {
+
+        componentesGLB.splice(index, 1);
+
+        renderizarTablaHijosGLB();
+
+    }
+
+
+
+    function renderizarTablaHijosGLB() {
+
+        const tbody = $('#listaHijosGLB');
+
+        tbody.empty();
+
+        
+
+        componentesGLB.forEach((c, idx) => {
+
+            const fila = `
+
+                <tr>
+
+                    <td class="ps-2 small text-truncate" style="max-width: 200px;">${c.nombre}</td>
+
+                    <td class="text-center fw-bold">${c.qty}</td>
+
+                    <td class="text-center">
+
+                         <i class="bi bi-trash3-fill text-danger" style="cursor:pointer" onclick="eliminarHijoGLB(${idx})"></i>
+
+                    </td>
+
+                </tr>`;
+
+            tbody.append(fila);
+
+        });
+
+        document.getElementById('conteoComponentes').innerText = componentesGLB.length + " items agregados";
+
+    }
+
+
+
+    window.verificarServicioOtro = function() {
+
+    const val = document.getElementById('selTipoServicio').value;
+
+    const div = document.getElementById('divNuevoServicio');
+
+    const input = document.getElementById('inputTituloNuevo');
+
+    
+
+    if (val === 'OTRO') {
+
+        div.classList.remove('d-none');
+
+        input.focus();
+
+    } else {
+
+        div.classList.add('d-none');
+
+        input.value = ''; // Limpiar si se arrepiente
+
+    }
+
+}
+
+
+
+    // --- NUEVO: FUNCIÓN PARA INSERTAR SÍMBOLOS EN EL TEXTAREA ---
+
+    window.insertarSimbolo = function(simbolo) {
+
+        const textarea = document.getElementById('glbDescripcion');
+
+        const start = textarea.selectionStart;
+
+        const end = textarea.selectionEnd;
+
+        const text = textarea.value;
+
+        
+
+        textarea.value = text.substring(0, start) + simbolo + text.substring(end);
+
+        textarea.selectionStart = textarea.selectionEnd = start + simbolo.length;
+
+        textarea.focus();
+
+    }
+
+
+
+    // 1. CARGAR SERVICIOS AL INICIO (Reemplaza la lista fija)
+
+function cargarListaServicios() {
+
+    const sel = document.getElementById('selTipoServicio');
+
+    
+
+    // 1. LISTA FIJA OBLIGATORIA (Tus predeterminados)
+
+    const defaults = [
+
+        { sku: 'SRV-GEN',  nombre: 'SERVICIO GENERAL' }, 
+
+        { sku: 'SRV-SOLD', nombre: 'SERVICIO DE SOLDADURA' },
+
+        { sku: 'SRV-GALV', nombre: 'SERVICIO DE GALVANIZADO' },
+
+        { sku: 'SRV-ZINC', nombre: 'SERVICIO DE ZINCADO' },
+
+        { sku: 'SRV-CORT', nombre: 'SERVICIO DE CORTE' },
+
+        { sku: 'SRV-ROSC', nombre: 'SERVICIO DE ROSCADO' }, // Estandarizado como ROSCADO para el Word
+
+        { sku: 'SRV-TROP', nombre: 'SERVICIO DE TROPICALIZADO' }
+
+    ];
+
+
+
+    // Limpiamos y ponemos cargando...
+
+    sel.innerHTML = '<option value="">Cargando...</option>';
+
+    
+
+    // 2. Intentar cargar extras de la BD
+
+    fetch('/api/listar_servicios_activos')
+
+        .then(r => r.json())
+
+        .then(data => {
+
+            sel.innerHTML = ''; // Limpiar mensaje de carga
+
+
+
+            // A. Mapa para no duplicar
+
+            const skusUsados = new Set();
+
+
+
+            // B. Poner PRIMERO tus fijos
+
+            defaults.forEach(def => {
+
+                let opt = document.createElement('option');
+
+                opt.value = def.sku;
+
+                opt.setAttribute('data-titulo', def.nombre);
+
+                opt.text = def.nombre;
+
+                sel.appendChild(opt);
+
+                skusUsados.add(def.sku);
+
+            });
+
+
+
+            // Separador visual
+
+            let separador = document.createElement('option');
+
+            separador.disabled = true;
+
+            separador.text = '─── NUEVOS / EXTRAS ───';
+
+            sel.appendChild(separador);
+
+
+
+            // C. Poner los nuevos de la BD
+
+            if(data.servicios) {
+
+                data.servicios.forEach(s => {
+
+                    if(!skusUsados.has(s.sku)) {
+
+                        let opt = document.createElement('option');
+
+                        opt.value = s.sku;
+
+                        opt.setAttribute('data-titulo', s.nombre);
+
+                        opt.text = s.nombre;
+
+                        sel.appendChild(opt);
+
+                    }
+
+                });
+
+            }
+
+        })
+
+        .catch(err => {
+
+            console.error("Error API o BD vacía, cargando solo defaults:", err);
+
+            // FALLBACK: Si falla la BD, al menos muestra los fijos
+
+            sel.innerHTML = '';
+
+            defaults.forEach(def => {
+
+                let opt = document.createElement('option');
+
+                opt.value = def.sku;
+
+                opt.setAttribute('data-titulo', def.nombre);
+
+                opt.text = def.nombre;
+
+                sel.appendChild(opt);
+
+            });
+
+        });
+
+}
+
+
+
+// Llama a esta función en el document.addEventListener('DOMContentLoaded', ...)
+
+// cargarListaServicios(); 
+
+
+
+// 2. ABRIR MODAL
+
+function abrirModalNuevoServicio() {
+
+    document.getElementById('inputNombreServicioNuevo').value = "";
+
+    new bootstrap.Modal(document.getElementById('modalNuevoServicio')).show();
+
+    setTimeout(() => document.getElementById('inputNombreServicioNuevo').focus(), 500);
+
+}
+
+
+
+// 3. GUARDAR EL NUEVO SERVICIO
+
+function guardarNuevoServicio() {
+
+    const nombre = document.getElementById('inputNombreServicioNuevo').value.trim().toUpperCase();
+
+    if(!nombre) return Swal.fire('Error', 'Escriba un nombre', 'warning');
+
+    
+
+    // Estandarización visual (Opcional)
+
+    let nombreFinal = nombre;
+
+    if(!nombre.startsWith('SERVICIO')) {
+
+        nombreFinal = 'SERVICIO DE ' + nombre;
+
+    }
+
+
+
+    let fd = new FormData();
+
+    fd.append('nombre', nombreFinal);
+
+
+
+    fetch('/api/crear_servicio_rapido', { method: 'POST', body: fd })
+
+        .then(r => r.json())
+
+        .then(data => {
+
+            if(data.status === 'success') {
+
+                // 1. Cerrar modal
+
+                bootstrap.Modal.getInstance(document.getElementById('modalNuevoServicio')).hide();
+
+                
+
+                // 2. Agregar al Select visualmente
+
+                const sel = document.getElementById('selTipoServicio');
+
+                
+
+                // Creamos la opción
+
+                let opt = document.createElement('option');
+
+                opt.value = data.sku; // Ej: SRV-LAVA
+
+                opt.setAttribute('data-titulo', data.nombre);
+
+                opt.text = data.nombre;
+
+                
+
+                // La insertamos justo después de los "Defaults" (antes del separador si quieres, o al final)
+
+                sel.appendChild(opt);
+
+                
+
+                // 3. Seleccionarla automáticamente
+
+                sel.value = data.sku; 
+
+                
+
+                // 4. AVISO DE ÉXITO CON EL CÓDIGO GENERADO
+
+                Swal.fire({
+
+                    icon: 'success', 
+
+                    title: '¡Servicio Creado!', 
+
+                    html: `Se ha generado el código interno: <b>${data.sku}</b><br>Ya está listo para usarse.`,
+
+                    timer: 3000,
+
+                    showConfirmButton: false
+
+                });
+
+
+
+            } else {
+
+                Swal.fire('Error', data.msg, 'error');
+
+            }
+
+        });
+
+}
+
+
+
+document.getElementById('btnAgregar').addEventListener('click', () => {
+
+    let itemParaCarrito = {desc_tipo: '',desc_valor: 0,desc_label: ''};
+
+    
+
+    // 1. OBTENCIÓN Y VALIDACIÓN PREVIA DE VALORES NUMÉRICOS
+
+    const rawPrecio = $('#precioManualInput').val();
+
+    const rawCant = $('#cantidadInput').val();
+
+
+
+    // Validar que no estén vacíos
+
+    if (rawPrecio === '' || rawCant === '') {
+
+        return Swal.fire({
+
+            icon: 'warning',
+
+            title: 'Datos Incompletos',
+
+            text: 'Por favor, ingrese una Cantidad y un Precio Unitario válidos.'
+
+        });
+
+    }
+
+
+
+    const precio = parseFloat(rawPrecio); 
+
+    const cant = parseFloat(rawCant);
+
+
+
+    // Validar que sean mayores a cero (o al menos el precio puede ser 0 si es una bonificación, pero la cantidad no)
+
+    if (isNaN(cant) || cant <= 0) {
+
+        return Swal.fire('Error', 'La cantidad debe ser mayor a 0.', 'warning');
+
+    }
+
+    if (isNaN(precio) || precio < 0) { // Precio permitimos 0 por si es regalo, pero no negativo
+
+        return Swal.fire('Error', 'El precio no puede ser negativo.', 'warning');
+
+    }
+
+
+
+    // --- VARIABLES BASE ---
+
+    let moneda = $('#selectMoneda').val(); 
+
+    let tc = parseFloat($('#inputTC').val()) || 1; 
+
+    let precioBase = (moneda === 'PEN') ? (precio / tc) : precio;
+
+    let unidadMedida = 'UND'; 
+
+
+
+    // ======================================================
+
+    // CASO A: MODO PRODUCTO
+
+    // ======================================================
+
+// ======================================================
+
+    // CASO A: MODO PRODUCTO (VALIDACIÓN MEJORADA)
+
+    // ======================================================
+
+    if (modoActual === 'PRODUCTO') {
+
+        const idProd = $('#productoSelect').val(); 
+
+        
+
+        // 1. Validar selección de producto
+
+        if(!idProd) {
+
+            return Swal.fire('Falta Producto', 'Busque y seleccione un producto de la lista.', 'warning'); 
+
+        }
+
+
+
+        // 2. Validar Cantidad (CRÍTICO)
+
+        // Usamos las variables 'cant' y 'precio' que ya definimos arriba
+
+        if (isNaN(cant) || cant <= 0) {
+
+            return Swal.fire('Error de Cantidad', 'La cantidad debe ser mayor a 0.', 'error');
+
+        }
+
+
+
+        // 3. Validar Precio (Decisión: Bloquear 0 para evitar errores)
+
+        if (isNaN(precio) || precio <= 0) {
+
+            return Swal.fire('Error de Precio', 'El precio debe ser mayor a 0.00', 'error');
+
+        }
+
+
+
+        const opt = $('#productoSelect').find(':selected'); 
+
+        const stockProd = parseInt(opt.data('stock')) || 0;
+
+        unidadMedida = 'UND'; 
+
+
+
+        // Alerta visual de stock (Aviso no bloqueante)
+
+        if (cant > stockProd) { 
+
+            Swal.mixin({ 
+
+                toast: true, position: 'top-end', showConfirmButton: false, timer: 4000 
+
+            }).fire({ icon: 'warning', title: '⚠️ Atención: Cantidad supera el Stock disponible' }); 
+
+        }
+
+        
+
+        // Lógica de agregado (Igual que antes)
+
+        let itemExistente = carrito.find(item => item.id === idProd && item.tipo === 'PRODUCTO');
+
+        
+
+        if (itemExistente) { 
+
+            itemExistente.cantidad += cant; 
+
+            itemExistente.subtotal = parseFloat((itemExistente.cantidad * itemExistente.precio).toFixed(2)); 
+
+        } else { 
+
+            itemParaCarrito = { 
+
+                id: idProd, sku: opt.data('sku'), nombre: opt.text(), 
+
+                stock: stockProd, cantidad: cant, precio: precio, precioBase: precioBase, 
+
+                subtotal: parseFloat((cant * precio).toFixed(2)), 
+
+                tipo_precio: 'Manual', tipo: 'PRODUCTO',
+
+                um: unidadMedida,
+
+                desc_tipo: '', 
+
+                desc_valor: 0, 
+
+                desc_label: ''
+
+            }; 
+
+            carrito.push(itemParaCarrito); 
+
+        }
+
+    }
+
+    
+
+    // ======================================================
+
+    // CASO B: MODO FABRICACIÓN / SERVICIO
+
+    // ======================================================
+
+    else if (modoActual === 'FABRICACION') {
+
+        const selectServ = document.getElementById('selTipoServicio');
+
+        
+
+        // Validación de Select de Servicio
+
+        if(!selectServ.value) {
+
+            return Swal.fire('Falta Tipo', 'Seleccione un tipo de servicio.', 'warning');
+
+        }
+
+
+
+        const opcion = selectServ.options[selectServ.selectedIndex];
+
+        let skuServicio = selectServ.value; 
+
+        let tituloServicio = opcion.getAttribute('data-titulo'); 
+
+
+
+        // Obtener descripción y convertir a mayúsculas
+
+        const rawDesc = document.getElementById('fabDesc').value;
+
+        const desc = rawDesc.trim().toUpperCase(); 
+
+        
+
+        // Validación de Descripción
+
+        if(!desc) {
+
+            return Swal.fire('Falta Descripción', 'Escriba el detalle técnico del servicio.', 'warning');
+
+        }
+
+        
+
+        unidadMedida = 'SRV'; 
+
+
+
+        // Crear nombre visual (HTML para la tabla)
+
+        let nombreVisual = `<strong>${tituloServicio}</strong> ${desc}`;
+
+
+
+        itemParaCarrito = { 
+
+            id: null, 
+
+            sku: skuServicio, 
+
+            nombre: nombreVisual, 
+
+            
+
+            // Datos para Backend/Word
+
+            titulo_glb: tituloServicio,   
+
+            descripcion_glb: desc,        
+
+            
+
+            stock: 9999, cantidad: cant, precio: precio, precioBase: precioBase, 
+
+            subtotal: parseFloat((cant * precio).toFixed(2)), 
+
+            tipo_precio: 'Manual', tipo: 'FABRICACION', um: unidadMedida 
+
+        }; 
+
+        
+
+        carrito.push(itemParaCarrito); 
+
+        
+
+        // Limpiar solo la descripción, dejar el tipo seleccionado por comodidad
+
+        document.getElementById('fabDesc').value = ""; 
+
+    } 
+
+    
+
+    // ======================================================
+
+    // CASO C: MODO GLB / KIT
+
+    // ======================================================
+
+    else if (modoActual === 'GLB') {
+
+        // Validación de Configuración GLB
+
+        if(!glbTempData) {
+
+            return Swal.fire('Kit Incompleto', 'Primero configure los componentes del Kit (Botón Configurar).', 'warning'); 
+
+        }
+
+
+
+        unidadMedida = 'GLB'; 
+
+
+
+        // Construir nombre visual
+
+        let nombreVisual = "";
+
+        if(glbTempData.titulo) nombreVisual += `<strong>${glbTempData.titulo.toUpperCase()}</strong> `;
+
+        if(glbTempData.descripcion) nombreVisual += `${glbTempData.descripcion.toUpperCase()}`;
+
+
+
+        itemParaCarrito = { 
+
+            id: null, sku: 'GLB', 
+
+            nombre: nombreVisual, 
+
+            
+
+            titulo_glb: glbTempData.titulo.toUpperCase(),
+
+            descripcion_glb: glbTempData.descripcion.toUpperCase(),
+
+            
+
+            stock: 9999, cantidad: cant, precio: precio, precioBase: precioBase, 
+
+            subtotal: parseFloat((cant * precio).toFixed(2)), 
+
+            tipo_precio: 'Manual', tipo: 'GLB', 
+
+            componentes: glbTempData.componentes, 
+
+            um: unidadMedida 
+
+        };
+
+        carrito.push(itemParaCarrito); 
+
+        
+
+        // Resetear datos temporales del GLB
+
+        glbTempData = null; 
+
+        document.getElementById('glbPreview').innerText = "Ningún kit configurado aún."; 
+
+        document.getElementById('glbPreview').className = "small text-muted fst-italic text-center border rounded p-2 bg-light";
+
+    } 
+
+    
+
+    // ======================================================
+
+    // FINALIZACIÓN COMÚN
+
+    // ======================================================
+
+    renderizarTabla();
+
+    
+
+    // Limpieza de campos comunes
+
+    if(modoActual === 'PRODUCTO') {
+
+        $('#productoSelect').val(null).trigger('change');
+
+    }
+
+    
+
+    $('#cantidadInput').val(1); 
+
+    $('#precioManualInput').val(""); 
+
+    $('#info_stock').val(""); 
+
+    
+
+    // Recalcular el subtotal previo (volverá a 0)
+
+    calcularSubtotalPrevio(); 
+
+    
+
+    // Alerta visual de éxito (opcional, pero ayuda mucho)
+
+    const Toast = Swal.mixin({
+
+        toast: true, position: 'top-end', showConfirmButton: false, timer: 1500,
+
+        didOpen: (toast) => { toast.addEventListener('mouseenter', Swal.stopTimer); toast.addEventListener('mouseleave', Swal.resumeTimer); }
+
+    });
+
+    Toast.fire({ icon: 'success', title: 'Item agregado' });
+
+});
+
+
+
+    // --- SELECT2 Y CLIENTES ---
+
+    function inicializarSelect2Cliente() {
+
+        $('#cli_doc_select').select2({
+
+            placeholder: "Escriba RUC o Nombre...", allowClear: true, width: '100%', tags: true, 
+
+            createTag: function (params) { return $.trim(params.term) === '' ? null : { id: params.term, text: params.term, newOption: true } },
+
+            ajax: { url: '/api/buscar_clientes_db', dataType: 'json', delay: 250, data: function (params) { return { q: params.term }; }, processResults: function (data) { return { results: data.results }; }, cache: true },
+
+            minimumInputLength: 0
+
+        });
+
+        $('#cli_doc_select').on('select2:select', function (e) {
+
+            var data = e.params.data;
+
+            if (data.nombre) {
+
+                $('#cli_nom').val(data.nombre).prop('readonly', true);
+
+                $('#cli_dir').val(data.direccion || '').prop('readonly', true);
+
+                
+
+                // LÓGICA DE COPIADO DE DIRECCIÓN PARA ENVÍO
+
+                $('#inputDireccionEntrega').val(data.direccion || '');
+
+
+
+                $('#cli_tel').val(data.telefono || '');
+
+                // GUARDAR EN HIDDENS PARA EL BOTÓN VER FICHA
+
+                $('#hidden_estado').val(data.estado);
+
+                $('#hidden_condicion').val(data.condicion);
+
+                
+
+                if(typeof actualizarBadges === 'function') actualizarBadges(data.estado, data.condicion);
+
+                $('#lbl_origen_datos').html(`<i class="bi bi-database"></i> Sistema (${data.updated})`);
+
+            } else {
+
+                $('#cli_nom').val("").prop('readonly', true); $('#cli_dir').val("").prop('readonly', true); $('#cli_tel').val(""); $('#lbl_origen_datos').html(`<i class="bi bi-pencil"></i> RUC Nuevo`);
+
+                $('#inputDireccionEntrega').val("");
+
+            }
+
+        });
+
+        $('#cli_doc_select').on('select2:clear', function (e) { 
+
+            $('#cli_nom').val(""); $('#cli_dir').val(""); $('#cli_tel').val(""); $('#lbl_origen_datos').html(""); 
+
+            $('#inputDireccionEntrega').val("");
+
+        });
+
+        
+
+        $('#productoSelect').select2({ 
+
+            placeholder: "Buscar producto...", allowClear: true, width: '100%',
+
+            templateResult: function (d) { if (!d.id) return d.text; return $(`<div class="prod-row"><div class="prod-code">${$(d.element).data('sku')}</div><div class="prod-desc">${d.text}</div><div class="prod-stock">Stk: ${$(d.element).data('stock')}</div></div>`); },
+
+            templateSelection: function (d) { return d.text; },
+
+            matcher: (params, data) => { if ($.trim(params.term) === '') return data; var term = params.term.toLowerCase(); var text = data.text.toLowerCase(); var sku = $(data.element).data('sku') ? $(data.element).data('sku').toString().toLowerCase() : ''; if (text.indexOf(term) > -1 || sku.indexOf(term) > -1) return data; return null; }
+
+        });
+
+        $('#productoSelect').on('select2:select', function (e) {
+
+            const opt = $(this).find(':selected'); stockActualSeleccionado = parseInt(opt.data('stock')) || 0;
+
+            $('#info_stock').val(stockActualSeleccionado); let precioBaseUSD = parseFloat(opt.data('punit')) || 0;
+
+            $('#precioBaseHidden').val(precioBaseUSD); calcularPrecioUnitarioVisual(); $('#precioManualInput').focus(); document.getElementById('btnAgregar').disabled = false;
+
+        });
+
+        $('#productoSelect').on('select2:clear', function (e) { stockActualSeleccionado = 0; $('#info_stock').val(""); $('#precioBaseHidden').val(""); $('#precioManualInput').val(""); document.getElementById('btnAgregar').disabled = true; calcularSubtotalPrevio(); });
+
+    }
+
+
+
+    function guardarSoloCliente() {
+
+        const ruc = $('#cli_doc_select').val(); const nombre = $('#cli_nom').val(); const tel = $('#cli_tel').val();
+
+        if(!ruc || !nombre) return Swal.fire('Error', 'Debe haber un cliente cargado', 'warning');
+
+        let formData = new FormData(); formData.append('documento', ruc); formData.append('telefono', tel);
+
+        fetch('/api/actualizar_telefono_cliente', { method: 'POST', body: formData }).then(r => r.json()).then(data => { if(data.status === 'success') { Swal.fire({ icon: 'success', title: 'Contacto guardado', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 }); } else { Swal.fire('Error', data.msg, 'error'); } });
+
+    }
+
+
+
+    function buscarClienteApi(force = false) {
+
+        let numero = $('#cli_doc_select').val(); 
+
+        if(!numero) return Swal.fire('Error', 'Escriba un número', 'warning');
+
+        
+
+        const btn = document.getElementById('btnBuscarSunat'); 
+
+        const iconoOriginal = btn.innerHTML; 
+
+        btn.disabled = true; 
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        
+
+        let formData = new FormData(); 
+
+        formData.append('numero', numero); 
+
+        if(force) formData.append('force', 'true');
+
+        
+
+        fetch('/api/consulta_documento', { method: 'POST', body: formData })
+
+        .then(r => r.json()).then(data => {
+
+            btn.disabled = false; btn.innerHTML = iconoOriginal;
+
+            
+
+            if(data.status === 'success') {
+
+                $('#cli_nom').val(data.razon_social).prop('readonly', true); 
+
+                $('#cli_dir').val(data.direccion || '').prop('readonly', true);
+
+                $('#inputDireccionEntrega').val(data.direccion || '');
+
+                if(data.telefono) $('#cli_tel').val(data.telefono);
+
+                
+
+                $('#hidden_estado').val(data.estado);
+
+                $('#hidden_condicion').val(data.condicion);
+
+                actualizarBadges(data.estado, data.condicion); 
+
+                
+
+                // --- NUEVO: MOSTRAR QUIEN Y CUANDO ---
+
+                let infoAudit = `Act: ${data.last_updated} (${data.updated_by})`;
+
+                let iconFuente = data.origen === 'BD' ? '<i class="bi bi-database"></i> BD Local' : '<i class="bi bi-cloud-download"></i> SUNAT';
+
+                
+
+                $('#lbl_origen_datos').html(`${iconFuente} | <span class="text-primary">${infoAudit}</span>`);
+
+                
+
+            } else { 
+
+                // Si es error (ej. Candado de ahorro activo), lo mostramos bonito
+
+                Swal.fire('Aviso', data.msg, 'warning'); 
+
+            }
+
+        }).catch(err => { 
+
+            console.error(err); 
+
+            btn.disabled = false; btn.innerHTML = iconoOriginal; 
+
+            Swal.fire('Error', 'Fallo de conexión', 'error'); 
+
+        });
+
+    }
+
+
 
     function confirmarForzado() { let ruc = $('#cli_doc_select').val(); if(!ruc) return Swal.fire('Error', 'Ingrese RUC', 'warning'); Swal.fire({ title: '¿Forzar Actualización?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí', cancelButtonText: 'No' }).then((result) => { if (result.isConfirmed) buscarClienteApi(true); }); }
-    
-    function guardarSoloCliente() {
-        const ruc = $('#cli_doc_select').val(); const nombre = $('#cli_nom').val(); const tel = $('#cli_tel').val();
-        if(!ruc || !nombre) return Swal.fire('Error', 'Debe haber un cliente cargado', 'warning');
-        let formData = new FormData(); formData.append('documento', ruc); formData.append('telefono', tel);
-        fetch('/api/actualizar_telefono_cliente', { method: 'POST', body: formData }).then(r => r.json()).then(data => { if(data.status === 'success') { Swal.fire({ icon: 'success', title: 'Contacto guardado', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 }); } else { Swal.fire('Error', data.msg, 'error'); } });
-    }
+
+
 
     function actualizarBadges(estado, condicion) {
+
         const bEst = document.getElementById('badge_estado'); const bCon = document.getElementById('badge_condicion');
+
         if(bEst) { bEst.innerText = `Estado: ${estado}`; bEst.className = estado === 'ACTIVO' ? 'badge bg-success' : 'badge bg-danger'; bEst.classList.remove('opacity-50'); }
+
         if(bCon) { bCon.innerText = `Cond: ${condicion}`; bCon.className = condicion === 'HABIDO' ? 'badge bg-success' : 'badge bg-warning text-dark'; bCon.classList.remove('opacity-50'); }
+
     }
 
-// --- 4. FUNCIONES DE CLIENTE Y SUNAT (Restauradas) ---
-// --- 4. FUNCIONES DE CLIENTE Y SUNAT (Restauradas) ---
-    function inicializarSelect2Cliente() {
-        $('#cli_doc_select').select2({
-            placeholder: "Escriba RUC o Nombre...", allowClear: true, width: '100%', tags: true, 
-            createTag: function (params) { return $.trim(params.term) === '' ? null : { id: params.term, text: params.term, newOption: true } },
-            ajax: { url: '/api/buscar_clientes_db', dataType: 'json', delay: 250, data: function (params) { return { q: params.term }; }, processResults: function (data) { return { results: data.results }; }, cache: true },
-            minimumInputLength: 0
-        });
-        
-        $('#cli_doc_select').on('select2:select', function (e) {
-            var data = e.params.data;
-            if (data.nombre) {
-                $('#cli_nom').val(data.nombre).prop('readonly', true);
-                $('#cli_dir').val(data.direccion || '').prop('readonly', true);
-                $('#inputDireccionEntrega').val(data.direccion || '');
-                $('#cli_tel').val(data.telefono || '');
-                $('#hidden_estado').val(data.estado);
-                $('#hidden_condicion').val(data.condicion);
-                if(typeof actualizarBadges === 'function') actualizarBadges(data.estado, data.condicion);
-                $('#lbl_origen_datos').html(`<i class="bi bi-database"></i> Sistema (${data.updated})`);
-            } else {
-                // Si el RUC es nuevo (no existe en BD)
-                $('#cli_nom').val("").prop('readonly', true); 
-                $('#cli_dir').val("").prop('readonly', true); 
-                $('#cli_tel').val(""); 
-                $('#lbl_origen_datos').html(`<i class="bi bi-pencil"></i> RUC Nuevo`);
-                $('#inputDireccionEntrega').val("");
+
+
+    function filtroTeclas(event, tipo) { if ([8, 9, 37, 39, 13, 46].includes(event.keyCode)) return true; if (['-','+','e','E'].includes(event.key)) return false; if (tipo === 'entero' && event.key === '.') return false; return true; }
+
+    function validarEntradaString(input, decimalesMax) {
+
+        let val = input.value.toString(); if (val.indexOf('.') >= 0) { let parts = val.split('.'); if (parts[1].length > decimalesMax) input.value = parts[0] + '.' + parts[1].substring(0, decimalesMax); }
+
+        if (input.value !== "" && parseFloat(input.value) < 0) input.value = Math.abs(parseFloat(input.value));
+
+        if(input.id === 'cantidadInput' || input.id === 'precioManualInput') calcularSubtotalPrevio();
+
+    }
+
+    function limpiarInputPrecio(input) { let val = parseFloat(input.value); input.value = !isNaN(val) ? (val < 0 ? 0 : parseFloat(val.toFixed(4))) : 0; if(input.onchange) input.onchange(); }
+
+    function limpiarInputCantidad(input) { let val = parseFloat(input.value); input.value = !isNaN(val) ? (val < 1 ? 1 : Math.floor(val)) : 1; if(input.onchange) input.onchange(); }
+
+
+
+    function calcularSubtotalPrevio() {
+
+        const cant = parseFloat($('#cantidadInput').val()) || 0; const precio = parseFloat($('#precioManualInput').val()) || 0;
+
+        let simbolo = ($('#selectMoneda').val() === 'PEN') ? 'S/' : '$'; $('#txt_subtotal_previo').text(`${simbolo} ${(cant * precio).toFixed(2)}`);
+
+    }
+
+
+
+    function calcularPrecioUnitarioVisual() {
+
+        let precioBase = parseFloat($('#precioBaseHidden').val()) || 0; let moneda = $('#selectMoneda').val(); let tc = parseFloat($('#inputTC').val()) || 1;
+
+        let precioFinal = (moneda === 'PEN') ? (precioBase * tc) : precioBase; $('#precioManualInput').val(parseFloat(precioFinal.toFixed(6))); calcularSubtotalPrevio();
+
+    }
+
+
+
+    function verComponentes(index) {
+
+        const item = carrito[index];
+
+        if(!item.componentes || item.componentes.length === 0) return;
+
+
+
+        // Agregamos la columna 'Faltante'
+
+        let htmlLista = '<div class="table-responsive"><table class="table table-sm table-bordered mb-0 align-middle">';
+
+        htmlLista += `<thead class="table-light text-center small">
+
+                        <tr>
+
+                            <th class="text-start">Componente</th>
+
+                            <th>Req. x Kit</th>
+
+                            <th>Total Req.</th>
+
+                            <th>Stock Disp.</th>
+
+                            <th class="text-danger">Faltante</th>
+
+                            <th>Estado</th>
+
+                        </tr>
+
+                      </thead><tbody>`;
+
+
+
+        item.componentes.forEach(c => {
+
+            let totalNecesario = c.qty * item.cantidad; // Ej: 2 pernos * 50 kits = 100
+
+            let stockDisp = c.stock_individual;
+
+            let deficit = 0;
+
+            
+
+            // Calculamos cuánto falta
+
+            if (totalNecesario > stockDisp) {
+
+                deficit = totalNecesario - stockDisp;
+
             }
+
+            
+
+            let tieneStock = (deficit === 0);
+
+            
+
+            // Estilos visuales
+
+            let colorFila = tieneStock ? '' : 'table-danger';
+
+            let textoFaltante = tieneStock ? '-' : `<strong>${deficit}</strong>`;
+
+            let textoEstado = tieneStock ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">STOCK BAJO</span>';
+
+
+
+            htmlLista += `<tr class="${colorFila} small">
+
+                            <td class="text-start">${c.nombre}</td>
+
+                            <td class="text-center">${c.qty}</td>
+
+                            <td class="text-center fw-bold">${totalNecesario}</td>
+
+                            <td class="text-center">${stockDisp}</td>
+
+                            <td class="text-center text-danger">${textoFaltante}</td>
+
+                            <td class="text-center">${textoEstado}</td>
+
+                          </tr>`;
+
         });
+
+        htmlLista += '</tbody></table></div>';
+
         
-        $('#cli_doc_select').on('select2:clear', function (e) { 
-            $('#cli_nom').val(""); $('#cli_dir').val(""); $('#cli_tel').val(""); $('#lbl_origen_datos').html(""); 
-            $('#inputDireccionEntrega').val("");
+
+        if(item.cantidad > 1) {
+
+            htmlLista += `<div class="mt-2 small text-muted text-end">Cálculo basado en <strong>${item.cantidad}</strong> kits solicitados.</div>`;
+
+        }
+
+
+
+        Swal.fire({
+
+            title: 'Análisis de Stock (GLB)',
+
+            html: htmlLista,
+
+            width: '700px', // Un poco más ancho para la nueva columna
+
+            confirmButtonText: 'Cerrar'
+
         });
+
     }
 
-    // --- 5. FUNCIONES DE CATALOGO (CASCADA Y SELECT2) ---
-    function cargarCalidadesVenta() {
-        const famNombre = $('#filtroFamiliaVenta option:selected').data('nombre');
-        const selCal = document.getElementById('filtroCalidadVenta'); selCal.innerHTML = '<option>Cargando...</option>'; selCal.disabled = true; $('#productoSelect').empty();
-        if(!famNombre) { selCal.innerHTML = '<option value="">-- Espere --</option>'; return; }
-        let fd = new FormData(); fd.append('familia', famNombre);
-        fetch('/api/calidades_de_familia', { method: 'POST', body: fd }).then(r => r.json()).then(data => {
-            selCal.innerHTML = '<option value="">-- Todas --</option>';
-            if(data.status === 'success') { data.calidades.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.text = c; selCal.appendChild(opt); }); selCal.disabled = false; }
-            cargarProductos();
-        });
-    }
 
-    function cargarProductos() {
-        const catId = $('#filtroFamiliaVenta').val(); const calFiltro = $('#filtroCalidadVenta').val();
-        const select = $('#productoSelect'); select.empty().append(new Option('Cargando...', '', false, false));
-        let url = catId ? `/api/productos_por_categoria/${catId}` : `/api/productos_por_categoria/0`; 
-        fetch(url).then(r => r.json()).then(data => {
-            select.empty().append(new Option('', '', true, true)); 
-            let lista = data.productos; if(calFiltro) lista = lista.filter(p => p.calidad === calFiltro);
-            if(lista.length === 0) select.empty().append(new Option('-- Vacío --', '', false, false));
-            else lista.forEach(p => { const o = new Option(p.nombre, p.id, false, false); $(o).attr({ 'data-sku': p.sku, 'data-stock': p.stock, 'data-punit': p.p_unidad }); select.append(o); });
-            select.val(null).trigger('change');
-        });
-    }
 
-    $('#productoSelect').select2({ 
-        placeholder: "Buscar producto...", allowClear: true, width: '100%',
-        templateResult: function (d) { if (!d.id) return d.text; return $(`<div class="prod-row"><div class="prod-code">${$(d.element).data('sku')}</div><div class="prod-desc">${d.text}</div><div class="prod-stock">Stk: ${$(d.element).data('stock')}</div></div>`); },
-        templateSelection: function (d) { return d.text; },
-        matcher: (params, data) => { if ($.trim(params.term) === '') return data; var term = params.term.toLowerCase(); var text = data.text.toLowerCase(); var sku = $(data.element).data('sku') ? $(data.element).data('sku').toString().toLowerCase() : ''; if (text.indexOf(term) > -1 || sku.indexOf(term) > -1) return data; return null; }
-    });
-    $('#productoSelect').on('select2:select', function (e) {
-        const opt = $(this).find(':selected'); stockActualSeleccionado = parseInt(opt.data('stock')) || 0;
-        $('#info_stock').val(stockActualSeleccionado); let precioBaseUSD = parseFloat(opt.data('punit')) || 0;
-        $('#precioBaseHidden').val(precioBaseUSD); calcularPrecioUnitarioVisual(); $('#precioManualInput').focus(); document.getElementById('btnAgregar').disabled = false;
-    });
-    $('#productoSelect').on('select2:clear', function (e) { stockActualSeleccionado = 0; $('#info_stock').val(""); $('#precioBaseHidden').val(""); $('#precioManualInput').val(""); document.getElementById('btnAgregar').disabled = true; calcularSubtotalPrevio(); });
+// --- FUNCIÓN RENDERIZAR TABLA COMPLETA Y OPTIMIZADA ---
 
-    // --- 6. AGREGAR AL CARRITO (BOTON) ---
-    document.getElementById('btnAgregar').addEventListener('click', () => {
-        let itemParaCarrito = {};
-        
-        const rawPrecio = $('#precioManualInput').val();
-        const rawCant = $('#cantidadInput').val();
-
-        if (rawPrecio === '' || rawCant === '') { return Swal.fire({ icon: 'warning', title: 'Datos Incompletos', text: 'Ingrese cantidad y precio unitario.' }); }
-
-        const precio = parseFloat(rawPrecio); 
-        const cant = parseFloat(rawCant);
-
-        if (isNaN(cant) || cant <= 0) return Swal.fire('Error', 'La cantidad debe ser mayor a 0.', 'warning');
-        if (isNaN(precio) || precio < 0) return Swal.fire('Error', 'El precio no puede ser negativo.', 'warning');
-
-        let moneda = $('#selectMoneda').val(); 
-        let tc = parseFloat($('#inputTC').val()) || 1; 
-        let precioBase = (moneda === 'PEN') ? (precio / tc) : precio;
-        let unidadMedida = 'UND'; 
-
-        if (modoActual === 'PRODUCTO') {
-            const idProd = $('#productoSelect').val(); 
-            if(!idProd) return Swal.fire('Falta Producto', 'Seleccione un producto.', 'warning'); 
-            if (precio <= 0) return Swal.fire('Error de Precio', 'El precio debe ser mayor a 0.00', 'error');
-
-            const opt = $('#productoSelect').find(':selected'); 
-            const stockProd = parseInt(opt.data('stock')) || 0;
-            unidadMedida = 'UND'; 
-
-            if (cant > stockProd) { 
-                Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 4000 }).fire({ icon: 'warning', title: '⚠️ Atención: Cantidad supera el Stock disponible' }); 
-            }
-            
-            let itemExistente = carrito.find(item => item.id === idProd && item.tipo === 'PRODUCTO');
-            if (itemExistente) { 
-                itemExistente.cantidad += cant; 
-                itemExistente.subtotal = parseFloat((itemExistente.cantidad * itemExistente.precio).toFixed(2)); 
-            } else { 
-                itemParaCarrito = { 
-                    id: idProd, sku: opt.data('sku'), nombre: opt.text(), 
-                    stock: stockProd, cantidad: cant, precio: precio, precioBase: precioBase, 
-                    subtotal: parseFloat((cant * precio).toFixed(2)), 
-                    tipo_precio: 'Manual', tipo: 'PRODUCTO', um: unidadMedida,
-                    desc_tipo: '', desc_valor: 0, desc_label: '' 
-                }; 
-                carrito.push(itemParaCarrito); 
-            }
-        } 
-        else if (modoActual === 'FABRICACION') {
-            const selectServ = document.getElementById('selTipoServicio');
-            if(!selectServ.value) return Swal.fire('Falta Tipo', 'Seleccione un servicio.', 'warning');
-            
-            const opcion = selectServ.options[selectServ.selectedIndex];
-            let skuServicio = selectServ.value; 
-            let tituloServicio = opcion.getAttribute('data-titulo'); 
-
-            const desc = document.getElementById('fabDesc').value.trim().toUpperCase(); 
-            if(!desc) return Swal.fire('Falta Descripción', 'Escriba el detalle técnico.', 'warning');
-            
-            unidadMedida = 'SRV'; 
-            let nombreVisual = `<strong>${tituloServicio}</strong> ${desc}`;
-
-            itemParaCarrito = { 
-                id: null, sku: skuServicio, nombre: nombreVisual, 
-                titulo_glb: tituloServicio, descripcion_glb: desc, 
-                stock: 9999, cantidad: cant, precio: precio, precioBase: precioBase, 
-                subtotal: parseFloat((cant * precio).toFixed(2)), 
-                tipo_precio: 'Manual', tipo: 'FABRICACION', um: unidadMedida,
-                desc_tipo: '', desc_valor: 0, desc_label: '' 
-            }; 
-            carrito.push(itemParaCarrito); 
-            document.getElementById('fabDesc').value = ""; 
-        } 
-        else if (modoActual === 'GLB') {
-            if(!glbTempData) return Swal.fire('Kit Incompleto', 'Configure los componentes primero.', 'warning'); 
-            
-            unidadMedida = 'GLB'; 
-            let nombreVisual = "";
-            if(glbTempData.titulo) nombreVisual += `<strong>${glbTempData.titulo.toUpperCase()}</strong> `;
-            if(glbTempData.descripcion) nombreVisual += `${glbTempData.descripcion.toUpperCase()}`;
-
-            itemParaCarrito = { 
-                id: null, sku: 'GLB', nombre: nombreVisual, 
-                titulo_glb: glbTempData.titulo.toUpperCase(), descripcion_glb: glbTempData.descripcion.toUpperCase(), 
-                stock: 9999, cantidad: cant, precio: precio, precioBase: precioBase, 
-                subtotal: parseFloat((cant * precio).toFixed(2)), 
-                tipo_precio: 'Manual', tipo: 'GLB', componentes: glbTempData.componentes, um: unidadMedida,
-                desc_tipo: '', desc_valor: 0, desc_label: '' 
-            };
-            carrito.push(itemParaCarrito); 
-            
-            glbTempData = null; 
-            document.getElementById('glbPreview').innerText = "Ningún kit configurado aún."; 
-            document.getElementById('glbPreview').className = "small text-muted fst-italic text-center border rounded p-2 bg-light";
-        } 
-        
-        renderizarTabla();
-        if(modoActual === 'PRODUCTO') $('#productoSelect').val(null).trigger('change');
-        $('#cantidadInput').val(1); $('#precioManualInput').val(""); $('#info_stock').val(""); 
-        calcularSubtotalPrevio(); 
-        
-        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 }).fire({ icon: 'success', title: 'Item agregado' });
-    });
-
-    // --- 7. RENDERIZAR TABLA Y ACTUALIZACIÓN ---
     function renderizarTabla() {
+
         const tbody = $('#tablaCarrito'); 
+
         tbody.empty();
+
         
+
         let moneda = $('#selectMoneda').val(); 
+
         let simbolo = (moneda === 'PEN') ? 'S/' : '$';
+
+
+
+        // Mostrar u ocultar mensaje de carrito vacío
 
         if(carrito.length > 0) $('#msgVacio').hide(); else $('#msgVacio').show();
 
+
+
         carrito.forEach((item, index) => {
-            let claseStock = ''; let badgeDisplay = 'none'; let textoBadge = '';
+
+            // 1. LÓGICA DE BADGES (ETIQUETAS) Y STOCK
+
+            let claseStock = ''; 
+
+            let badgeDisplay = 'none';
+
+            let textoBadge = '';
+
             
+
+            // A. Validación Stock Producto Simple
+
             if (item.tipo === 'PRODUCTO') {
+
                 if (item.cantidad > item.stock) {
-                    claseStock = 'stock-insuficiente'; badgeDisplay = 'inline-block'; textoBadge = `Sin Stock (Max: ${item.stock})`;
+
+                    claseStock = 'stock-insuficiente'; // Clase CSS para pintar rojo el input
+
+                    badgeDisplay = 'inline-block';
+
+                    textoBadge = `Sin Stock (Max: ${item.stock})`;
+
                 }
-            } else if (item.tipo === 'GLB' && item.componentes) {
+
+            } 
+
+            // B. Validación Stock Kit (GLB) - Opcional pero recomendado
+
+            else if (item.tipo === 'GLB' && item.componentes) {
+
+                // Verificamos si algún componente interno falta
+
                 let componenteFaltante = item.componentes.some(c => (c.qty * item.cantidad) > c.stock_individual);
+
                 if (componenteFaltante) {
-                    claseStock = 'stock-insuficiente'; badgeDisplay = 'inline-block'; textoBadge = `Componentes sin Stock`;
+
+                    claseStock = 'stock-insuficiente';
+
+                    badgeDisplay = 'inline-block';
+
+                    textoBadge = `Componentes sin Stock`;
+
                 }
+
             }
+
+
+
+            // 2. ETIQUETAS DE TIPO (FAB / KIT) Y UNIDAD MEDIDA
 
             let umVisual = item.um || (item.tipo === 'PRODUCTO' ? 'UND' : (item.tipo === 'FABRICACION' ? 'SRV' : 'GLB'));
-            let etiquetaTipo = ''; let botonVer = ''; 
 
-            if(item.tipo === 'FABRICACION') etiquetaTipo = '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">FAB</span>';
-            if(item.tipo === 'GLB') { 
-                etiquetaTipo = '<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">KIT</span>'; 
-                let colorOjo = (claseStock !== '') ? 'btn-danger' : 'btn-outline-info';
-                botonVer = `<button class="btn btn-sm ${colorOjo} me-1" onclick="verComponentes(${index})" title="Ver contenido"><i class="bi bi-eye-fill"></i></button>`;
+            let etiquetaTipo = '';
+
+            let botonVer = ''; // Botón para ver contenido del Kit
+
+
+
+            if(item.tipo === 'FABRICACION') {
+
+                etiquetaTipo = '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">FAB</span>';
+
             }
 
-            // Lógica de Precio Tachado (Descuento)
-            let precioTachadoHtml = '';
-            let inputClass = 'editable-cell';
             
-            if (item.desc_valor > 0) {
-                let tc_actual = parseFloat($('#inputTC').val()) || 1;
-                let precioOriginal = (moneda === 'PEN') ? (item.precioBase * tc_actual) : item.precioBase;
-                precioTachadoHtml = `<del class="text-muted d-block" style="font-size: 0.75rem; margin-bottom: -2px;">${precioOriginal.toFixed(2)}</del>`;
-                inputClass = 'editable-cell text-danger fw-bold border-danger bg-danger bg-opacity-10'; 
+
+            if(item.tipo === 'GLB') { 
+
+                etiquetaTipo = '<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">KIT</span>'; 
+
+                // El ojo se pone rojo si falta stock en el kit
+
+                let colorOjo = (claseStock !== '') ? 'btn-danger' : 'btn-outline-info';
+
+                botonVer = `<button class="btn btn-sm ${colorOjo} me-1" onclick="verComponentes(${index})" title="Ver contenido"><i class="bi bi-eye-fill"></i></button>`;
+
             }
+
+
+
+            // 3. CONSTRUCCIÓN DEL HTML DE LA FILA
 
             tbody.append(`
+
                 <tr id="fila-${index}">
+
                     <td class="ps-3">
+
                         <div class="product-name-cell" style="font-size: 0.85rem;">
+
                             ${item.nombre} ${etiquetaTipo} <br> <span class="badge bg-danger mt-1">${item.desc_label}</span>
+
                         </div>
+
                         <div class="small text-muted fw-light">${item.sku}</div>
+
                         <span class="badge bg-danger ms-1" style="font-size:0.6rem; display:${badgeDisplay};">
+
                             <i class="bi bi-exclamation-triangle-fill"></i> ${textoBadge}
+
                         </span>
+
                     </td>
+
+
+
                     <td class="text-center small text-muted fw-bold pt-3">${umVisual}</td>
-                    <td class="text-center pt-3">
+
+                    
+
+                    <td class="text-center">
+
                         <input type="number" id="input_cant_${index}" 
+
                                class="editable-cell text-center ${claseStock}" 
+
                                style="width: 70px;" value="${item.cantidad}" min="1" step="1"
+
                                onkeydown="return evitarNegativos(event)"
+
                                oninput="actualizarFilaSinRedibujar(${index}, 'cant', this.value)">
+
                     </td>
-                    <td class="text-end pt-2">
-                        ${precioTachadoHtml}
+
+
+
+                    <td class="text-end">
+
                         <input type="number" id="input_precio_${index}" 
-                               class="${inputClass}" 
+
+                               class="editable-cell" 
+
                                style="width: 90px;" value="${item.precio}" min="0" step="any"
+
                                onkeydown="return evitarNegativos(event)"
-                               onchange="actualizarFilaManual(${index}, this.value)">
+
+                               oninput="actualizarFilaSinRedibujar(${index}, 'precio', this.value)">
+
                     </td>
+
+
+
                     <td class="text-end fw-bold text-dark small pt-3">
+
                         ${simbolo} <span id="lbl_subtotal_${index}">${item.subtotal.toFixed(2)}</span>
+
                     </td>
-                    <td class="text-center text-nowrap pt-3">
+
+
+
+                    <td class="text-center text-nowrap pt-2">
+
                         ${botonVer}
-                        <button class="btn btn-sm btn-outline-warning border-0" onclick="aplicarDescuentoItem(${index})" title="Aplicar Descuento">
+
+                        <button class="btn btn-sm btn-outline-warning border-0" onclick="aplicarDescuentoItem(${index})" title="Aplicar Descuento a este Item">
+
                             <i class="bi bi-percent"></i>
+
                         </button>
+
                         <button class="btn btn-sm btn-outline-danger border-0" onclick="eliminarFila(${index})" title="Eliminar ítem">
+
                             <i class="bi bi-trash"></i>
+
                         </button>
+
                     </td>
+
                 </tr>
+
             `);
+
         });
 
+
+
+        // 4. ACTUALIZAR TOTALES FINALES
+
         actualizarTotalesGlobales();
+
+        
+
+        // 5. ACTUALIZAR BADGE DE T.C. VISUAL (Si es Soles)
+
+        const tcActual = parseFloat($('#inputTC').val()) || 0;
+
+        if(moneda === 'PEN') {
+
+            actualizarBadgeVisualTC(tcActual);
+
+        } else {
+
+            actualizarBadgeVisualTC(null); // Ocultar
+
+        }
+
     }
+
+
+
+    // Función auxiliar para mostrar/ocultar el badge en el header de la tabla
+
+    function actualizarBadgeVisualTC() {
+
+        const moneda = $('#selectMoneda').val();
+
+        const tc = $('#inputTC').val();
+
+        const badge = $('#badgeTC_Visual');
+
+        const lbl = $('#lblTC_Visual');
+
+
+
+        if (moneda === 'PEN') {
+
+            lbl.text(parseFloat(tc).toFixed(3));
+
+            badge.removeClass('d-none'); // Mostrar
+
+        } else {
+
+            badge.addClass('d-none'); // Ocultar
+
+        }
+
+    }
+
+
+
+// --- FUNCIÓN OPTIMIZADA: ACTUALIZA DATOS Y VERIFICA STOCK AL INSTANTE ---
 
     window.actualizarFilaSinRedibujar = function(index, tipo, valor) {
-        let val = parseFloat(valor); if (isNaN(val) || val < 0) val = 0;
+
+        let val = parseFloat(valor);
+
+        if (isNaN(val) || val < 0) val = 0;
+
+        
+
         let item = carrito[index];
+
+
+
+        // 1. Actualizar memoria
+
         if (tipo === 'cant') item.cantidad = val;
 
+        if (tipo === 'precio') item.precio = val;
+
+
+
+        // 2. Recalcular subtotal
+
         item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+
+
+
+        // 3. Actualizar texto de subtotal
+
         $(`#lbl_subtotal_${index}`).text(item.subtotal.toFixed(2));
 
+
+
+        // 4. --- CORRECCIÓN CLAVE: VERIFICACIÓN DE STOCK EN TIEMPO REAL ---
+
+        // Buscamos el input y el badge de esa fila específica
+
         const inputCant = document.getElementById(`input_cant_${index}`);
-        const badgeAviso = document.querySelector(`#fila-${index} .badge.bg-danger`); 
+
+        const badgeAviso = document.querySelector(`#fila-${index} .badge.bg-danger`); // El badge de alerta
+
         
+
         if (item.tipo === 'PRODUCTO') {
+
             if (item.cantidad > item.stock) {
+
+                // SI FALTA STOCK: Pintar rojo y mostrar aviso
+
                 inputCant.classList.add('stock-insuficiente');
-                if(badgeAviso) { badgeAviso.style.display = 'inline-block'; badgeAviso.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> Sin Stock (Max: ${item.stock})`; }
+
+                if(badgeAviso) {
+
+                    badgeAviso.style.display = 'inline-block';
+
+                    badgeAviso.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> Sin Stock (Max: ${item.stock})`;
+
+                }
+
             } else {
+
+                // SI HAY STOCK: Quitar rojo y ocultar aviso
+
                 inputCant.classList.remove('stock-insuficiente');
+
                 if(badgeAviso) badgeAviso.style.display = 'none';
+
             }
+
         }
+
+        // ---------------------------------------------------------------
+
+
+
+        // 5. Recalcular totales generales
+
         actualizarTotalesGlobales();
+
     }
+
+
+
+    // --- VALIDACIONES DE TECLAS Y FORMATOS ---
+
+
+
+    // Bloquea signos -, +, e en inputs tipo number
+
+    window.evitarNegativos = function(e) {
+
+        if(['-', '+', 'e', 'E'].includes(e.key)) return false;
+
+        return true;
+
+    }
+
+
+
+    // Valida el input de descuento (Max 2 decimales, No negativos)
+
+    window.validarInputDescuento = function(input) {
+
+        let val = parseFloat(input.value);
+
+        if (isNaN(val)) val = 0;
+
+        if (val < 0) val = 0;
+
+        
+
+        // Limitar a 2 decimales si el usuario escribe más
+
+        if (input.value.includes('.')) {
+
+            let parts = input.value.split('.');
+
+            if (parts[1].length > 2) {
+
+                input.value = parseFloat(val).toFixed(2);
+
+            }
+
+        }
+
+    }
+
+
+
+    // Funciones visuales (Badge y Símbolos)
+
+    function actualizarSimbolosVisuales(moneda) {
+
+        let simbolo = moneda === 'PEN' ? 'S/' : '$';
+
+        $('#simboloMonedaInput').text(simbolo); 
+
+        $('#lblMonedaUnit').text(moneda); 
+
+        $('#tipoDescuento option[value="MONTO"]').text(simbolo);
+
+        calcularPrecioUnitarioVisual(); 
+
+    }
+
+
+
+    function actualizarBadgeVisualTC(tcValor) {
+
+        const badge = $('#badgeTC_Visual');
+
+        const lbl = $('#lblTC_Visual');
+
+        if (tcValor !== null && tcValor > 0) {
+
+            lbl.text(parseFloat(tcValor).toFixed(3));
+
+            badge.removeClass('d-none'); 
+
+        } else {
+
+            badge.addClass('d-none');
+
+        }
+
+    }
+
+
+
+    window.evitarNegativos = function(e) {
+
+        // Bloquea: signo menos (-), signo mas (+), letra 'e' (exponencial)
+
+        if(['-', '+', 'e', 'E'].includes(e.key)) return false;
+
+        return true;
+
+    }
+
+
+
+    // --- 3. REEMPLAZAR FUNCTION ACTUALIZARFILA (OPTIMIZADA) ---
+
+    // Esta versión NO redibuja toda la tabla, solo actualiza los cálculos.
+
+    function actualizarFila(index, tipo, valor) {
+
+        let val = parseFloat(valor);
+
+        
+
+        // Validación básica
+
+        if (isNaN(val) || val < 0) val = 0;
+
+        
+
+        let item = carrito[index];
+
+
+
+        if (tipo === 'cant') {
+
+            item.cantidad = val;
+
+        } else if (tipo === 'precio') {
+
+            item.precio = val;
+
+        }
+
+
+
+        // Recalcular subtotal de la fila
+
+        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+
+        
+
+        // ACTUALIZACIÓN DOM PUNTUAL (Sin borrar el input donde escribes)
+
+        // Solo actualizamos el texto del subtotal de esa fila
+
+        $(`#lbl_subtotal_${index}`).text(item.subtotal.toFixed(2));
+
+
+
+        // Recalcular totales generales (Pie de página)
+
+        actualizarTotalesGlobales();
+
+    }
+
+
+
+    function actualizarFila(index, tipo, valor) {
+
+        let val = parseFloat(valor); if (isNaN(val)) val = 0; let item = carrito[index];
+
+        if (tipo === 'cant') item.cantidad = val; else if (tipo === 'precio') item.precio = val;
+
+        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100; renderizarTabla();
+
+    }
+
+
 
     function actualizarTotalesGlobales() {
+
+        // 1. Sumar todos los items
+
         let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
+
         let simbolo = ($('#selectMoneda').val() === 'PEN') ? 'S/' : '$';
 
-        let tipoDesc = $('#tipoDescuento').val(); 
+
+
+        // 2. Calcular Descuento
+
+        let tipoDesc = $('#tipoDescuento').val(); // 'MONTO' o 'PORCENTAJE'
+
         let valorDesc = parseFloat($('#inputDescuento').val()) || 0;
+
         let montoDescontado = 0;
 
+
+
         if (tipoDesc === 'PORCENTAJE') {
-            if(valorDesc > 100) valorDesc = 100; 
+
+            // Si es %, calculamos el % del total de items
+
+            if(valorDesc > 100) valorDesc = 100; // Seguridad
+
             montoDescontado = totalItems * (valorDesc / 100);
+
         } else {
+
+            // Si es Monto fijo
+
             montoDescontado = valorDesc;
+
         }
 
+
+
+        // Seguridad: El descuento no puede ser mayor al total
+
         if(montoDescontado > totalItems) montoDescontado = totalItems;
+
+
+
+        // 3. Calcular Base Imponible (Neto)
+
         let subtotalNeto = totalItems - montoDescontado;
+
+
+
+        // 4. Calcular IGV y Total Final
+
         const igv = subtotalNeto * 0.18;
+
         const totalFinal = subtotalNeto + igv;
 
+
+
+        // 5. Renderizar en HTML
+
         $('#lblSubtotalInicial').text(`${simbolo} ${totalItems.toFixed(2)}`);
+
         $('#lblMontoDescuento').text(`- ${simbolo} ${montoDescontado.toFixed(2)}`);
+
         $('#lblSubtotalNeto').text(`${simbolo} ${subtotalNeto.toFixed(2)}`);
+
+        
+
         $('#lblIGV').text(`${simbolo} ${igv.toFixed(2)}`);
+
         $('#lblTotal').text(`${simbolo} ${totalFinal.toFixed(2)}`);
+
     }
+
+
 
     function eliminarFila(index) { carrito.splice(index, 1); renderizarTabla(); }
 
-    // --- 8. LÓGICA DE SERVICIOS Y GLB ---
-    function cambiarModo(modo) {
-        modoActual = modo;
-        $('#panelProducto').addClass('d-none'); $('#panelFabricacion').addClass('d-none'); $('#panelGLB').addClass('d-none');
-        $('#precioManualInput').prop('readonly', false); $('#info_stock').val(''); 
-        document.getElementById('btnAgregar').disabled = (modo === 'PRODUCTO' && !$('#productoSelect').val());
-        if(modo === 'PRODUCTO') { $('#panelProducto').removeClass('d-none'); if($('#productoSelect').val()) { $('#info_stock').val(stockActualSeleccionado); document.getElementById('btnAgregar').disabled = false; } } 
-        else if (modo === 'FABRICACION') { $('#panelFabricacion').removeClass('d-none'); $('#info_stock').val('N/A'); document.getElementById('btnAgregar').disabled = false; } 
-        else if (modo === 'GLB') { $('#panelGLB').removeClass('d-none'); $('#info_stock').val('ARMADO'); document.getElementById('btnAgregar').disabled = false; }
-        calcularSubtotalPrevio();
-    }
 
-    function inicializarSelect2GLB() {
-        $('#filtroFamiliaGLB').select2({ dropdownParent: $('#modalGLB'), placeholder: "Escriba para buscar familia...", allowClear: true, width: '100%' });
-        $('#selectHijoGLB').select2({
-            dropdownParent: $('#modalGLB'), placeholder: "Buscar componente...", allowClear: true, width: 'style',
-            templateResult: function (d) { if (!d.id) return d.text; return $(`<div class="small d-flex justify-content-between"><span>${d.text}</span><span class="text-success fw-bold">Stk: ${$(d.element).data('stock')}</span></div>`); },
-            matcher: (params, data) => { if ($.trim(params.term) === '') return data; return (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) ? data : null; }
-        });
-    }
 
-    function abrirModalGLB() {
-        componentesGLB = []; $('#listaHijosGLB').empty(); $('#glbTitulo').val(""); $('#glbDescripcion').val("");
-        $('#filtroFamiliaGLB').val("").trigger('change'); $('#filtroCalidadGLB').html('<option value="">-- 2. Calidad --</option>').prop('disabled', true);
-        $('#selectHijoGLB').empty().append('<option value="">3. Buscar componente...</option>');
-        new bootstrap.Modal(document.getElementById('modalGLB')).show();
-    }
+function recalcularCarritoPorMoneda() {
 
-    function agregarHijoGLB() {
-        const data = $('#selectHijoGLB').select2('data')[0];
-        const qty = parseInt($('#cantHijoGLB').val()) || 1;
-        if(!data || !data.id) return;
-        const stockReal = parseInt($(data.element).data('stock')) || 0;
-        componentesGLB.push({ id: data.id, nombre: data.text, qty: qty, stock_individual: stockReal });
-        renderizarTablaHijosGLB();
-        $('#selectHijoGLB').val(null).trigger('change'); $('#cantHijoGLB').val(1);
-    }
+        let moneda = $('#selectMoneda').val(); 
 
-    function guardarConfigGLB() {
-        const titulo = document.getElementById('glbTitulo').value.trim(); 
-        const desc = document.getElementById('glbDescripcion').value.trim(); 
-        if(!titulo && !desc) return Swal.fire('Vacío', 'Ingrese al menos un título o descripción.', 'warning');
-        if(componentesGLB.length === 0) return Swal.fire('Vacío', 'Agregue al menos un componente al kit.', 'warning');
-        glbTempData = { titulo: titulo, descripcion: desc, componentes: [...componentesGLB] };
-        let htmlPreview = `<div class="text-start ps-3 border-start border-4 border-success bg-white p-2 small">`;
-        if(titulo) htmlPreview += `<strong>${titulo}</strong> `; 
-        if(desc) htmlPreview += `<span>${desc}</span>`;
-        htmlPreview += `<br><span class="badge bg-secondary mt-1">${componentesGLB.length} componentes</span></div>`;
-        document.getElementById('glbPreview').innerHTML = htmlPreview;
-        document.getElementById('glbPreview').className = "mt-2"; 
-        bootstrap.Modal.getInstance(document.getElementById('modalGLB')).hide();
-    }
+        let tc = parseFloat($('#inputTC').val()) || 1;
 
-    function cargarCalidadesGLB() {
-        const famNombre = $('#filtroFamiliaGLB option:selected').data('nombre');
-        const selCal = document.getElementById('filtroCalidadGLB'); 
-        selCal.innerHTML = '<option>Cargando...</option>'; selCal.disabled = true; $('#selectHijoGLB').empty();
-        if(!famNombre) { selCal.innerHTML = '<option value="">-- Espere familia --</option>'; return; }
-        let fd = new FormData(); fd.append('familia', famNombre);
-        fetch('/api/calidades_de_familia', { method: 'POST', body: fd }).then(r => r.json()).then(data => {
-            selCal.innerHTML = '<option value="">-- Todas --</option>';
-            if(data.status === 'success') { data.calidades.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.text = c; selCal.appendChild(opt); }); selCal.disabled = false; }
-            cargarProductosGLB(); 
-        });
-    }
+        let simbolo = moneda === 'PEN' ? 'S/' : '$';
 
-    function cargarProductosGLB() {
-        const catId = $('#filtroFamiliaGLB').val(); const calFiltro = $('#filtroCalidadGLB').val();
-        const select = $('#selectHijoGLB'); select.empty().append(new Option('Cargando...', '', false, false));
-        let url = catId ? `/api/productos_por_categoria/${catId}` : `/api/productos_por_categoria/0`; 
-        fetch(url).then(r => r.json()).then(data => {
-            select.empty().append(new Option('', '', true, true)); 
-            let lista = data.productos; if(calFiltro && calFiltro !== "") lista = lista.filter(p => p.calidad === calFiltro);
-            if(lista.length === 0) select.empty().append(new Option('-- No hay productos --', '', false, false));
-            else lista.forEach(p => { const o = new Option(p.nombre, p.id, false, false); $(o).attr({ 'data-sku': p.sku, 'data-stock': p.stock }); select.append(o); });
-            select.val(null).trigger('change');
-        });
-    }
 
-    window.eliminarHijoGLB = function(index) { componentesGLB.splice(index, 1); renderizarTablaHijosGLB(); }
-    function renderizarTablaHijosGLB() {
-        const tbody = $('#listaHijosGLB'); tbody.empty();
-        componentesGLB.forEach((c, idx) => {
-            tbody.append(`<tr><td class="ps-2 small text-truncate" style="max-width: 200px;">${c.nombre}</td><td class="text-center fw-bold">${c.qty}</td><td class="text-center"><i class="bi bi-trash3-fill text-danger" style="cursor:pointer" onclick="eliminarHijoGLB(${idx})"></i></td></tr>`);
-        });
-        document.getElementById('conteoComponentes').innerText = componentesGLB.length + " items agregados";
-    }
 
-    function cargarListaServicios() {
-        const sel = document.getElementById('selTipoServicio');
-        const defaults = [
-            { sku: 'SRV-GEN',  nombre: 'SERVICIO GENERAL' }, 
-            { sku: 'SRV-SOLD', nombre: 'SERVICIO DE SOLDADURA' },
-            { sku: 'SRV-GALV', nombre: 'SERVICIO DE GALVANIZADO' },
-            { sku: 'SRV-ZINC', nombre: 'SERVICIO DE ZINCADO' },
-            { sku: 'SRV-CORT', nombre: 'SERVICIO DE CORTE' },
-            { sku: 'SRV-ROSC', nombre: 'SERVICIO DE ROSCADO' },
-            { sku: 'SRV-TROP', nombre: 'SERVICIO DE TROPICALIZADO' }
-        ];
-        sel.innerHTML = '<option value="">Cargando...</option>';
-        fetch('/api/listar_servicios_activos').then(r => r.json()).then(data => {
-            sel.innerHTML = ''; const skusUsados = new Set();
-            defaults.forEach(def => { let opt = document.createElement('option'); opt.value = def.sku; opt.setAttribute('data-titulo', def.nombre); opt.text = def.nombre; sel.appendChild(opt); skusUsados.add(def.sku); });
-            let separador = document.createElement('option'); separador.disabled = true; separador.text = '─── NUEVOS / EXTRAS ───'; sel.appendChild(separador);
-            if(data.servicios) { data.servicios.forEach(s => { if(!skusUsados.has(s.sku)) { let opt = document.createElement('option'); opt.value = s.sku; opt.setAttribute('data-titulo', s.nombre); opt.text = s.nombre; sel.appendChild(opt); } }); }
-        }).catch(err => {
-            sel.innerHTML = ''; defaults.forEach(def => { let opt = document.createElement('option'); opt.value = def.sku; opt.setAttribute('data-titulo', def.nombre); opt.text = def.nombre; sel.appendChild(opt); });
-        });
-    }
+        $('#simboloMonedaInput').text(simbolo); 
 
-    function abrirModalNuevoServicio() {
-        document.getElementById('inputNombreServicioNuevo').value = "";
-        new bootstrap.Modal(document.getElementById('modalNuevoServicio')).show();
-        setTimeout(() => document.getElementById('inputNombreServicioNuevo').focus(), 500);
-    }
+        $('#lblMonedaUnit').text(moneda);  
 
-    function guardarNuevoServicio() {
-        const nombre = document.getElementById('inputNombreServicioNuevo').value.trim().toUpperCase();
-        if(!nombre) return Swal.fire('Error', 'Escriba un nombre', 'warning');
-        let nombreFinal = nombre; if(!nombre.startsWith('SERVICIO')) nombreFinal = 'SERVICIO DE ' + nombre;
-        let fd = new FormData(); fd.append('nombre', nombreFinal);
-        fetch('/api/crear_servicio_rapido', { method: 'POST', body: fd }).then(r => r.json()).then(data => {
-            if(data.status === 'success') {
-                bootstrap.Modal.getInstance(document.getElementById('modalNuevoServicio')).hide();
-                const sel = document.getElementById('selTipoServicio');
-                let opt = document.createElement('option'); opt.value = data.sku; opt.setAttribute('data-titulo', data.nombre); opt.text = data.nombre;
-                sel.appendChild(opt); sel.value = data.sku; 
-                Swal.fire({ icon: 'success', title: '¡Servicio Creado!', html: `Se ha generado el código interno: <b>${data.sku}</b><br>Ya está listo para usarse.`, timer: 3000, showConfirmButton: false });
-            } else { Swal.fire('Error', data.msg, 'error'); }
-        });
-    }
+        
 
-    function insertarSimbolo(simbolo) {
-        const textarea = document.getElementById('glbDescripcion');
-        const start = textarea.selectionStart; const end = textarea.selectionEnd; const text = textarea.value;
-        textarea.value = text.substring(0, start) + simbolo + text.substring(end);
-        textarea.selectionStart = textarea.selectionEnd = start + simbolo.length;
-        textarea.focus();
-    }
+        // Actualizar símbolo del selector de descuento general (El que está abajo de la tabla)
 
-    function verComponentes(index) {
-        const item = carrito[index];
-        if(!item.componentes || item.componentes.length === 0) return;
-        let htmlLista = '<div class="table-responsive"><table class="table table-sm table-bordered mb-0 align-middle"><thead class="table-light text-center small"><tr><th class="text-start">Componente</th><th>Req. x Kit</th><th>Total Req.</th><th>Stock Disp.</th><th class="text-danger">Faltante</th><th>Estado</th></tr></thead><tbody>';
-        item.componentes.forEach(c => {
-            let totalNecesario = c.qty * item.cantidad; let stockDisp = c.stock_individual; let deficit = 0;
-            if (totalNecesario > stockDisp) deficit = totalNecesario - stockDisp;
-            let tieneStock = (deficit === 0); let colorFila = tieneStock ? '' : 'table-danger';
-            let textoFaltante = tieneStock ? '-' : `<strong>${deficit}</strong>`; let textoEstado = tieneStock ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">STOCK BAJO</span>';
-            htmlLista += `<tr class="${colorFila} small"><td class="text-start">${c.nombre}</td><td class="text-center">${c.qty}</td><td class="text-center fw-bold">${totalNecesario}</td><td class="text-center">${stockDisp}</td><td class="text-center text-danger">${textoFaltante}</td><td class="text-center">${textoEstado}</td></tr>`;
-        });
-        htmlLista += '</tbody></table></div>';
-        if(item.cantidad > 1) htmlLista += `<div class="mt-2 small text-muted text-end">Cálculo basado en <strong>${item.cantidad}</strong> kits solicitados.</div>`;
-        Swal.fire({ title: 'Análisis de Stock (GLB)', html: htmlLista, width: '700px', confirmButtonText: 'Cerrar' });
-    }
+        $('#tipoDescuento option[value="MONTO"]').text(simbolo); 
 
-    function previsualizarVenta() {
-        const ruc = $('#cli_doc_select').val(); const nombre = $('#cli_nom').val();
-        if(!ruc || !nombre) return Swal.fire('Falta Cliente', 'Por favor seleccione un cliente válido.', 'warning');
-        if(carrito.length === 0) return Swal.fire('Carrito Vacío', 'Agregue al menos un producto o servicio.', 'warning');
 
-        let itemsSinStock = [];
-        carrito.forEach(item => {
-            if (item.tipo === 'PRODUCTO' && item.cantidad > item.stock) itemsSinStock.push({ nombre: item.nombre, solicitado: item.cantidad, stock: item.stock, faltante: item.cantidad - item.stock });
-        });
 
-        if (itemsSinStock.length > 0) {
-            let htmlTabla = `<div class="alert alert-warning text-start small mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Los siguientes productos superan el stock disponible. ¿Desea continuar con la cotización de todos modos?</div><div class="table-responsive border rounded bg-white" style="max-height: 200px; overflow-y: auto;"><table class="table table-sm table-striped mb-0 small text-start"><thead class="table-light sticky-top"><tr><th>Producto</th><th class="text-center">Solic.</th><th class="text-center">Stock</th><th class="text-end text-danger">Falta</th></tr></thead><tbody>`;
-            itemsSinStock.forEach(i => { htmlTabla += `<tr><td>${i.nombre}</td><td class="text-center fw-bold">${i.solicitado}</td><td class="text-center">${i.stock}</td><td class="text-end text-danger fw-bold">-${i.faltante}</td></tr>`; });
-            htmlTabla += `</tbody></table></div>`;
-            Swal.fire({ title: 'Stock Insuficiente Detectado', html: htmlTabla, icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, Cotizar igual', cancelButtonText: 'Corregir cantidades', confirmButtonColor: '#e0a800', cancelButtonColor: '#6c757d', width: '600px' })
-            .then((result) => { if (result.isConfirmed) mostrarModalResumen(); });
-            return; 
+        calcularPrecioUnitarioVisual();
+
+        
+
+        if(carrito.length > 0) {
+
+            Swal.fire({ 
+
+                title: 'Cambio de Moneda', 
+
+                text: 'Se recalcularán los precios y descuentos.', 
+
+                icon: 'warning', 
+
+                showCancelButton: true 
+
+            }).then((r) => {
+
+                if(r.isConfirmed) { 
+
+                    carrito.forEach(item => { 
+
+                        
+
+                        // --- INICIO DEL NUEVO CÁLCULO DE DESCUENTO (PASO D) ---
+
+                        let precio_puro = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
+
+                        
+
+                        // Reaplicar descuento individual si lo tiene
+
+                        if (item.desc_valor > 0) {
+
+                            if (item.desc_tipo === '%') {
+
+                                item.precio = precio_puro * (1 - (item.desc_valor / 100));
+
+                            } else {
+
+                                // Si es un descuento en moneda fija ($ o S/), lo aproximamos a la nueva moneda
+
+                                let desc_monto_base = (moneda === 'PEN') ? (item.desc_valor * tc) : (item.desc_valor / tc); 
+
+                                item.precio = precio_puro - desc_monto_base;
+
+                                if (item.precio < 0) item.precio = 0;
+
+                            }
+
+                        } else {
+
+                            item.precio = precio_puro;
+
+                        }
+
+                        
+
+                        // Asegurar 6 decimales internos para no perder centavos en matemáticas de JS
+
+                        item.precio = parseFloat(item.precio.toFixed(6));
+
+                        // --- FIN DEL NUEVO CÁLCULO ---
+
+
+
+                        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100; 
+
+                    }); 
+
+                    renderizarTabla(); 
+
+                } else {
+
+                    // Si el usuario cancela, volvemos el selector visual a la moneda anterior
+
+                    $('#selectMoneda').val(monedaAnterior);
+
+                    actualizarSimbolosVisuales(monedaAnterior);
+
+                }
+
+            });
+
         }
-        mostrarModalResumen();
+
+        // Forzamos actualización de totales para refrescar símbolos
+
+        actualizarTotalesGlobales();
+
     }
 
-    function mostrarModalResumen() {
-        $('#res_cliente').text($('#cli_nom').val()); $('#res_ruc').text($('#cli_doc_select').val());
-        let dir = $('#inputDireccionEntrega').val(); if($('#selectEntrega').val() === 'Recojo') dir = "RECOJO EN TIENDA";
-        $('#res_direccion').text(dir || '-');
 
-        const tbody = $('#tablaResumenBody'); tbody.empty();
-        carrito.forEach(item => {
-            let alertaStock = (item.tipo === 'PRODUCTO' && item.cantidad > item.stock) ? '<i class="bi bi-exclamation-circle-fill text-warning ms-1" title="Sin Stock"></i>' : '';
-            tbody.append(`<tr><td>${item.nombre} ${alertaStock}</td><td class="text-center fw-bold">${item.cantidad}</td><td class="text-end">${item.precio.toFixed(2)}</td><td class="text-end fw-bold">${item.subtotal.toFixed(2)}</td></tr>`);
-        });
 
-        $('#res_neto').text($('#lblSubtotalNeto').text()); $('#res_igv').text($('#lblIGV').text()); $('#res_total').text($('#lblTotal').text());
-        new bootstrap.Modal(document.getElementById('modalResumenVenta')).show();
-    }
+// --- REEMPLAZAR ESTA FUNCIÓN EN TU SCRIPT DE nueva_venta.html ---
+
+
 
     function confirmarYGuardar() {
+
+        // 1. Cerrar modal resumen
+
         bootstrap.Modal.getInstance(document.getElementById('modalResumenVenta')).hide();
-        Swal.fire({ title: 'Procesando...', text: 'Guardando información...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+
+
+        // 2. Mostrar cargando
+
+        Swal.fire({
+
+            title: 'Procesando...', text: 'Guardando información...', 
+
+            allowOutsideClick: false, 
+
+            didOpen: () => { Swal.showLoading() } 
+
+        });
+
+
+
+        // 3. Cálculos Finales
 
         let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
-        let tipoDesc = $('#tipoDescuento').val(); let valorDesc = parseFloat($('#inputDescuento').val()) || 0; let montoDescontado = 0;
-        if (tipoDesc === 'PORCENTAJE') montoDescontado = totalItems * (valorDesc / 100); else montoDescontado = valorDesc;
+
+        let tipoDesc = $('#tipoDescuento').val(); 
+
+        let valorDesc = parseFloat($('#inputDescuento').val()) || 0;
+
+        let montoDescontado = 0;
+
+        
+
+        if (tipoDesc === 'PORCENTAJE') montoDescontado = totalItems * (valorDesc / 100);
+
+        else montoDescontado = valorDesc;
+
+        
+
         if(montoDescontado > totalItems) montoDescontado = totalItems;
 
-        let subtotalNeto = totalItems - montoDescontado; let igv = subtotalNeto * 0.18; let totalFinal = subtotalNeto + igv;
+
+
+        let subtotalNeto = totalItems - montoDescontado;
+
+        let igv = subtotalNeto * 0.18;
+
+        let totalFinal = subtotalNeto + igv;
+
+
+
+        // --- 4. DETECTAR SI ES EDICIÓN (LA CLAVE DEL ARREGLO) ---
+
         const orderIdEditing = document.getElementById('hidden_order_id').value;
-        let urlDestino = orderIdEditing ? '/actualizar_venta' : '/nueva_venta';
+
+        
+
+        // Determinar URL de destino: Si hay ID es UPDATE, si no es CREATE
+
+        let urlDestino = '/nueva_venta';
+
+        if (orderIdEditing && orderIdEditing !== '') {
+
+            urlDestino = '/actualizar_venta';
+
+        }
+
+
+
+        // --- 5. CONSTRUIR PAYLOAD ---
 
         const payload = {
-            order_id: orderIdEditing, cliente_ruc: $('#cli_doc_select').val(), cliente_nombre: $('#cli_nom').val(), cliente_tel: $('#cli_tel').val(), cliente_dir: $('#cli_dir').val(),
-            cliente_atte: $('#cli_atte').val(), orden_compra: $('#cli_oc').val(), condicion_pago: $('#inputCondicionPago').val(), validez_oferta: $('#inputValidez').val(), plazo_entrega_texto: "", observacion: $('#inputObservacion').val(),
-            fecha_entrega: $('#inputFechaEntrega').val(), tipo_entrega: $('#selectEntrega').val(), direccion_entrega: $('#inputDireccionEntrega').val(),
-            moneda: $('#selectMoneda').val(), tc: $('#inputTC').val(), items: carrito,
-            subtotal: subtotalNeto, igv: igv, total: totalFinal, descuento_tipo: tipoDesc, descuento_valor: valorDesc, descuento_total: montoDescontado
+
+            order_id: orderIdEditing, // ENVIAMOS EL ID (Vacío si es nuevo, lleno si es edición)
+
+            
+
+            cliente_ruc: $('#cli_doc_select').val(), 
+
+            cliente_nombre: $('#cli_nom').val(), 
+
+            cliente_tel: $('#cli_tel').val(), 
+
+            cliente_dir: $('#cli_dir').val(),
+
+            cliente_atte: $('#cli_atte').val(), 
+
+            orden_compra: $('#cli_oc').val(),
+
+            
+
+            condicion_pago: $('#inputCondicionPago').val(), 
+
+            validez_oferta: $('#inputValidez').val(),
+
+            plazo_entrega_texto: "", 
+
+            observacion: $('#inputObservacion').val(),
+
+            
+
+            fecha_entrega: $('#inputFechaEntrega').val(), 
+
+            tipo_entrega: $('#selectEntrega').val(), 
+
+            direccion_entrega: $('#inputDireccionEntrega').val(),
+
+            
+
+            moneda: $('#selectMoneda').val(), 
+
+            tc: $('#inputTC').val(), 
+
+            items: carrito, 
+
+            
+
+            subtotal: subtotalNeto, 
+
+            igv: igv, 
+
+            total: totalFinal,
+
+            
+
+            descuento_tipo: tipoDesc,
+
+            descuento_valor: valorDesc,
+
+            descuento_total: montoDescontado
+
         };
+
         
-        fetch(urlDestino, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+
+        // --- 6. ENVIAR AL SERVIDOR ---
+
+        fetch(urlDestino, { 
+
+            method: 'POST', 
+
+            headers: {'Content-Type': 'application/json'}, 
+
+            body: JSON.stringify(payload) 
+
+        })
+
         .then(r => r.json()).then(data => {
+
             if(data.status === 'success') {
+
+                // Mensaje diferente si editamos o creamos
+
                 let tituloMsg = orderIdEditing ? '¡Actualizado!' : '¡Cotización Creada!';
+
                 let textoMsg = orderIdEditing ? 'La cotización ha sido corregida correctamente.' : `Se generó la cotización #${data.order_id}`;
-                Swal.fire({ title: tituloMsg, html: `<p class="mb-3">${textoMsg}</p><div class="d-grid gap-2"><a href="/descargar_cotizacion/${data.order_id}" class="btn btn-primary fw-bold"><i class="bi bi-file-earmark-pdf-fill"></i> DESCARGAR PDF</a><a href="{{ url_for('historial_ventas') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver al Historial</a></div>`, icon: 'success', showConfirmButton: false, allowOutsideClick: false });
-            } else { Swal.fire('Error', data.msg, 'error'); }
-        }).catch(err => { console.error(err); Swal.fire('Error Crítico', 'No se pudo conectar con el servidor', 'error'); });
+
+
+
+                Swal.fire({ 
+
+                    title: tituloMsg, 
+
+                    html: `
+
+                        <p class="mb-3">${textoMsg}</p>
+
+                        <div class="d-grid gap-2">
+
+                            <a href="/descargar_cotizacion/${data.order_id}" class="btn btn-primary fw-bold">
+
+                                <i class="bi bi-file-earmark-pdf-fill"></i> DESCARGAR PDF
+
+                            </a>
+
+                            <a href="{{ url_for('historial_ventas') }}" class="btn btn-outline-secondary">
+
+                                <i class="bi bi-arrow-left"></i> Volver al Historial
+
+                            </a>
+
+                        </div>
+
+                    `,
+
+                    icon: 'success',
+
+                    showConfirmButton: false,
+
+                    allowOutsideClick: false
+
+                });
+
+            } else { 
+
+                Swal.fire('Error', data.msg, 'error'); 
+
+            }
+
+        })
+
+        .catch(err => {
+
+            console.error(err);
+
+            Swal.fire('Error Crítico', 'No se pudo conectar con el servidor', 'error');
+
+        });
+
     }
 
-    function toggleDireccionEntrega() {
-        const tipo = document.getElementById('selectEntrega').value; const divDir = document.getElementById('divDireccionEntrega');
-        if (tipo === 'Envio') {
-            $(divDir).slideDown(); const dirFiscal = document.getElementById('cli_dir').value; const dirActual = document.getElementById('inputDireccionEntrega').value;
-            if(dirFiscal && !dirActual) document.getElementById('inputDireccionEntrega').value = dirFiscal;
-        } else { $(divDir).slideUp(); }
+
+
+    function actualizarDolar(forzar = false) {
+
+        const btn = document.querySelector('button[title="Consultar SUNAT"]'); if(btn) btn.disabled = true;
+
+        fetch('/api/tipo_cambio_actual?force=' + (forzar ? 'true' : 'false')).then(r => r.json()).then(data => {
+
+            if(!forzar && data.es_de_hoy) { Swal.fire({ title: 'Dato Actualizado', icon: 'info', showCancelButton: true, confirmButtonText: 'Forzar' }).then(r => { if(r.isConfirmed) actualizarDolar(true); }); return; }
+
+            $('#inputTC').val(data.tc.toFixed(3)); $('#msgTC').text(`Act: ${data.updated_at}`); recalcularCarritoPorMoneda(); if(btn) btn.disabled = false;
+
+        });
+
     }
 
-    function verFichaCliente() {
-        const ruc = $('#cli_doc_select').val(); if(!ruc) return Swal.fire('Sin Datos', 'Busque un cliente primero.', 'info');
-        const nom = $('#cli_nom').val(); const dir = $('#cli_dir').val(); const tel = $('#cli_tel').val(); const est = $('#hidden_estado').val() || '-'; const con = $('#hidden_condicion').val() || '-';
-        Swal.fire({ title: 'Ficha del Cliente', html: `<div style="text-align: left; font-size: 0.9rem;"><p><strong>RUC/DNI:</strong> ${ruc}</p><p><strong>Nombre:</strong> ${nom}</p><p><strong>Dirección:</strong> ${dir}</p><p><strong>Teléfono:</strong> ${tel}</p><hr><p><strong>Estado SUNAT:</strong> <span class="badge bg-${est === 'ACTIVO' ? 'success' : 'danger'}">${est}</span></p><p><strong>Condición:</strong> <span class="badge bg-${con === 'HABIDO' ? 'success' : 'warning'}">${con}</span></p></div>`, icon: 'info', confirmButtonText: 'Cerrar' });
+
+
+    function guardarVenta() {
+
+        const ruc = $('#cli_doc_select').val();
+
+        if(!ruc) return Swal.fire('Falta Cliente', 'Ingrese datos', 'warning');
+
+        if(carrito.length === 0) return Swal.fire('Vacío', 'Agregue productos', 'warning');
+
+        
+
+        // --- VALIDACIÓN DE STOCK CON TABLA ORDENADA ---
+
+        let filasError = '';
+
+        let hayError = false;
+
+
+
+        carrito.forEach((item, idx) => {
+
+            // A. VALIDAR PRODUCTO INDIVIDUAL (UND)
+
+            if(item.tipo === 'PRODUCTO') {
+
+                if(item.cantidad > item.stock) {
+
+                    let faltante = item.cantidad - item.stock;
+
+                    // Limpiamos etiquetas HTML del nombre para que se vea limpio
+
+                    let nombreLimpio = item.nombre.replace(/<[^>]*>?/gm, ''); 
+
+                    
+
+                    filasError += `
+
+                        <tr>
+
+                            <td class="text-start align-middle">${nombreLimpio}</td>
+
+                            <td class="text-center align-middle">${item.cantidad}</td>
+
+                            <td class="text-center align-middle">${item.stock}</td>
+
+                            <td class="text-center align-middle text-danger fw-bold">-${faltante}</td>
+
+                        </tr>
+
+                    `;
+
+                    hayError = true;
+
+                }
+
+            } 
+
+            // B. VALIDAR KIT (GLB)
+
+            else if (item.tipo === 'GLB') {
+
+                let componentesFaltantes = [];
+
+                
+
+                item.componentes.forEach(c => {
+
+                    let totalReq = c.qty * item.cantidad;
+
+                    if (totalReq > c.stock_individual) {
+
+                        componentesFaltantes.push({
+
+                            nombre: c.nombre,
+
+                            req: totalReq,
+
+                            stock: c.stock_individual,
+
+                            falta: totalReq - c.stock_individual
+
+                        });
+
+                    }
+
+                });
+
+
+
+                if(componentesFaltantes.length > 0) {
+
+                    let nombreKit = item.titulo_glb || item.nombre.replace(/<[^>]*>?/gm, '');
+
+                    
+
+                    // 1. Fila de Título del Kit (Fondo gris claro para distinguir)
+
+                    filasError += `
+
+                        <tr class="table-secondary">
+
+                            <td colspan="4" class="text-start fw-bold small text-uppercase">
+
+                                <i class="bi bi-box-seam"></i> [KIT] ${nombreKit}
+
+                            </td>
+
+                        </tr>
+
+                    `;
+
+
+
+                    // 2. Filas de sus componentes (Indentados)
+
+                    componentesFaltantes.forEach(c => {
+
+                        filasError += `
+
+                            <tr>
+
+                                <td class="text-start ps-4 small align-middle">↳ ${c.nombre}</td>
+
+                                <td class="text-center small align-middle">${c.req}</td>
+
+                                <td class="text-center small align-middle">${c.stock}</td>
+
+                                <td class="text-center small align-middle text-danger fw-bold">-${c.falta}</td>
+
+                            </tr>
+
+                        `;
+
+                    });
+
+                    hayError = true;
+
+                }
+
+            }
+
+        });
+
+
+
+// --- EN NUEVA_VENTA.HTML (dentro de function guardarVenta) ---
+
+
+
+        if (hayError) {
+
+            // CONSTRUIMOS LA TABLA COMPLETA CON MENSAJE DE COTIZACIÓN
+
+            let htmlMsg = `
+
+                <div class="alert alert-warning small p-2 mb-2 text-center text-dark border-warning">
+
+                    <i class="bi bi-exclamation-triangle-fill"></i> <strong>Aviso de Disponibilidad Limitada</strong>
+
+                </div>
+
+                
+
+                <div class="mb-2 small text-start">
+
+                    Los siguientes ítems superan el stock actual. Se pueden cotizar, pero <strong>no hay disponibilidad inmediata</strong> para despacho:
+
+                </div>
+
+
+
+                <div class="table-responsive border rounded" style="max-height: 300px; overflow-y: auto;">
+
+                    <table class="table table-sm table-bordered mb-0">
+
+                        <thead class="table-light text-center small sticky-top">
+
+                            <tr>
+
+                                <th class="text-start" style="width: 50%">Producto / Insumo</th>
+
+                                <th style="width: 15%">Solic.</th>
+
+                                <th style="width: 15%">Stock</th>
+
+                                <th style="width: 20%" class="text-danger">Déficit</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            ${filasError}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+
+                <div class="mt-3 small text-muted text-start border-top pt-2 fst-italic">
+
+                    <i class="bi bi-info-circle"></i> <strong>Nota:</strong> Esta cotización quedará sujeta a reposición de stock o aprobación de gerencia para su atención.
+
+                </div>
+
+            `;
+
+            
+
+            Swal.fire({
+
+                title: 'Confirmar Cotización',
+
+                html: htmlMsg,
+
+                icon: 'question', // Icono de pregunta en vez de warning rojo fuerte
+
+                width: '800px',
+
+                showCancelButton: true,
+
+                confirmButtonColor: '#e6a23c', // Color naranja (advertencia) en vez de rojo
+
+                cancelButtonColor: '#6c757d',
+
+                confirmButtonText: 'Entendido, Generar Cotización',
+
+                cancelButtonText: 'Revisar Cantidades',
+
+                reverseButtons: true
+
+            }).then((result) => {
+
+                if (result.isConfirmed) {
+
+                    enviarDatosBackend();
+
+                }
+
+            });
+
+        } else {
+
+            // Todo OK
+
+            enviarDatosBackend();
+
+        }
+
     }
+
+
+
+    function previsualizarVenta() {
+
+        // A. Validaciones básicas
+
+        const ruc = $('#cli_doc_select').val();
+
+        const nombre = $('#cli_nom').val();
+
+        if(!ruc || !nombre) return Swal.fire('Falta Cliente', 'Por favor seleccione un cliente válido.', 'warning');
+
+        if(carrito.length === 0) return Swal.fire('Carrito Vacío', 'Agregue al menos un producto o servicio.', 'warning');
+
+
+
+        // B. --- DETECCIÓN DE QUIEBRE DE STOCK ---
+
+        let itemsSinStock = [];
+
+        
+
+        carrito.forEach(item => {
+
+            if (item.tipo === 'PRODUCTO' && item.cantidad > item.stock) {
+
+                itemsSinStock.push({
+
+                    nombre: item.nombre,
+
+                    solicitado: item.cantidad,
+
+                    stock: item.stock,
+
+                    faltante: item.cantidad - item.stock
+
+                });
+
+            }
+
+            // (Opcional) Lógica para Kits GLB si la deseas incluir
+
+        });
+
+
+
+        // C. SI HAY PROBLEMAS DE STOCK, MOSTRAR ADVERTENCIA INTERMEDIA
+
+        if (itemsSinStock.length > 0) {
+
+            let htmlTabla = `
+
+                <div class="alert alert-warning text-start small mb-2">
+
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+
+                    Los siguientes productos superan el stock disponible. ¿Desea continuar con la cotización de todos modos?
+
+                </div>
+
+                <div class="table-responsive border rounded bg-white" style="max-height: 200px; overflow-y: auto;">
+
+                    <table class="table table-sm table-striped mb-0 small text-start">
+
+                        <thead class="table-light sticky-top">
+
+                            <tr><th>Producto</th><th class="text-center">Solic.</th><th class="text-center">Stock</th><th class="text-end text-danger">Falta</th></tr>
+
+                        </thead>
+
+                        <tbody>
+
+            `;
+
+            
+
+            itemsSinStock.forEach(i => {
+
+                htmlTabla += `
+
+                    <tr>
+
+                        <td>${i.nombre}</td>
+
+                        <td class="text-center fw-bold">${i.solicitado}</td>
+
+                        <td class="text-center">${i.stock}</td>
+
+                        <td class="text-end text-danger fw-bold">-${i.faltante}</td>
+
+                    </tr>`;
+
+            });
+
+            
+
+            htmlTabla += `</tbody></table></div>`;
+
+
+
+            Swal.fire({
+
+                title: 'Stock Insuficiente Detectado',
+
+                html: htmlTabla,
+
+                icon: 'warning',
+
+                showCancelButton: true,
+
+                confirmButtonText: 'Sí, Cotizar igual',
+
+                cancelButtonText: 'Corregir cantidades',
+
+                confirmButtonColor: '#e0a800', // Color Ambar/Naranja
+
+                cancelButtonColor: '#6c757d',
+
+                width: '600px'
+
+            }).then((result) => {
+
+                if (result.isConfirmed) {
+
+                    // Si dice que SÍ, mostramos el resumen final normal
+
+                    mostrarModalResumen();
+
+                }
+
+            });
+
+            
+
+            return; // DETENEMOS LA EJECUCIÓN AQUÍ si hubo alerta
+
+        }
+
+
+
+        // D. SI TODO ESTÁ BIEN (O SI EL USUARIO ACEPTÓ EL RIESGO), MOSTRAMOS EL RESUMEN
+
+        mostrarModalResumen();
+
+    }
+
+
+
+function mostrarModalResumen() {
+
+        $('#res_cliente').text($('#cli_nom').val());
+
+        $('#res_ruc').text($('#cli_doc_select').val());
+
+        let dir = $('#inputDireccionEntrega').val();
+
+        if($('#selectEntrega').val() === 'Recojo') dir = "RECOJO EN TIENDA";
+
+        $('#res_direccion').text(dir || '-');
+
+
+
+        const tbody = $('#tablaResumenBody'); tbody.empty();
+
+        carrito.forEach(item => {
+
+            let alertaStock = (item.tipo === 'PRODUCTO' && item.cantidad > item.stock) ? '<i class="bi bi-exclamation-circle-fill text-warning ms-1" title="Sin Stock"></i>' : '';
+
+            tbody.append(`<tr><td>${item.nombre} ${alertaStock}</td><td class="text-center fw-bold">${item.cantidad}</td><td class="text-end">${item.precio.toFixed(2)}</td><td class="text-end fw-bold">${item.subtotal.toFixed(2)}</td></tr>`);
+
+        });
+
+
+
+        $('#res_neto').text($('#lblSubtotalNeto').text());
+
+        $('#res_igv').text($('#lblIGV').text());
+
+        $('#res_total').text($('#lblTotal').text());
+
+        new bootstrap.Modal(document.getElementById('modalResumenVenta')).show();
+
+    }
+
+
+
+    // --- FUNCIÓN AUXILIAR PARA MOSTRAR EL MODAL FINAL ---
+
+    function enviarDatosBackend() {
+
+        // --- 1. CÁLCULOS FINALES EN JS (Para enviar estructura, el Backend recalcula por seguridad) ---
+
+        let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
+
+        
+
+        let tipoDesc = $('#tipoDescuento').val(); 
+
+        let valorDesc = parseFloat($('#inputDescuento').val()) || 0;
+
+        let montoDescontado = 0;
+
+        
+
+        if (tipoDesc === 'PORCENTAJE') montoDescontado = totalItems * (valorDesc / 100);
+
+        else montoDescontado = valorDesc;
+
+        
+
+        if(montoDescontado > totalItems) montoDescontado = totalItems;
+
+
+
+        let subtotalNeto = totalItems - montoDescontado;
+
+        let igv = subtotalNeto * 0.18;
+
+        let totalFinal = subtotalNeto + igv;
+
+
+
+        // --- 2. DETECTAR SI ES EDICIÓN ---
+
+        const orderIdEditing = document.getElementById('hidden_order_id').value;
+
+        
+
+        // Determinar URL de destino
+
+        let urlDestino = '/nueva_venta';
+
+        if (orderIdEditing) {
+
+            urlDestino = '/actualizar_venta';
+
+        }
+
+
+
+        // --- 3. CONSTRUIR PAYLOAD ---
+
+        const payload = {
+
+            order_id: orderIdEditing, // Se envía (vacío si es nuevo, con ID si es edit)
+
+            
+
+            // Datos del Cliente
+
+            cliente_ruc: $('#cli_doc_select').val(), 
+
+            cliente_nombre: $('#cli_nom').val(), 
+
+            cliente_tel: $('#cli_tel').val(), 
+
+            cliente_dir: $('#cli_dir').val(),
+
+            cliente_atte: $('#cli_atte').val(), 
+
+            orden_compra: $('#cli_oc').val(),
+
+            
+
+            // Condiciones Comerciales
+
+            condicion_pago: $('#inputCondicionPago').val(), 
+
+            validez_oferta: $('#inputValidez').val(),
+
+            plazo_entrega_texto: "", 
+
+            observacion: $('#inputObservacion').val(),
+
+            
+
+            // Logística
+
+            fecha_entrega: $('#inputFechaEntrega').val(), 
+
+            tipo_entrega: $('#selectEntrega').val(), 
+
+            direccion_entrega: $('#inputDireccionEntrega').val(),
+
+            
+
+            // Moneda y Items
+
+            moneda: $('#selectMoneda').val(), 
+
+            tc: $('#inputTC').val(), 
+
+            items: carrito, 
+
+            
+
+            // Totales (Referenciales para el backend)
+
+            subtotal: subtotalNeto, 
+
+            igv: igv, 
+
+            total: totalFinal,
+
+            
+
+            descuento_tipo: tipoDesc,
+
+            descuento_valor: valorDesc,
+
+            descuento_total: montoDescontado
+
+        };
+
+        
+
+        // --- 4. ENVIAR AL SERVIDOR ---
+
+        // Mostrar cargando
+
+        Swal.fire({
+
+            title: 'Procesando...', 
+
+            text: 'Guardando información...',
+
+            allowOutsideClick: false,
+
+            didOpen: () => { Swal.showLoading() }
+
+        });
+
+
+
+        fetch(urlDestino, { 
+
+            method: 'POST', 
+
+            headers: {'Content-Type': 'application/json'}, 
+
+            body: JSON.stringify(payload) 
+
+        })
+
+        .then(r => r.json()).then(data => {
+
+            if(data.status === 'success') {
+
+                let msg = orderIdEditing ? 'Cambios guardados correctamente.' : 'Cotización creada exitosamente.';
+
+                
+
+                Swal.fire({ 
+
+                    title: '¡Éxito!', 
+
+                    text: msg, 
+
+                    icon: 'success',
+
+                    showCancelButton: true,
+
+                    confirmButtonText: 'Ver PDF',
+
+                    cancelButtonText: 'Ir al Historial'
+
+                }).then((result) => {
+
+                    if (result.isConfirmed) {
+
+                        // Descargar PDF
+
+                        window.location.href = `/descargar_cotizacion/${data.order_id}`;
+
+                    } else {
+
+                        // Redirigir al historial
+
+                        window.location.href = "{{ url_for('historial_ventas') }}";
+
+                    }
+
+                });
+
+            } else { 
+
+                Swal.fire('Error', data.msg, 'error'); 
+
+            }
+
+        })
+
+        .catch(err => {
+
+            console.error(err);
+
+            Swal.fire('Error Crítico', 'No se pudo conectar con el servidor', 'error');
+
+        });
+
+    }
+
+
+
+    function cargarCalidadesVenta() {
+
+        const famNombre = $('#filtroFamiliaVenta option:selected').data('nombre');
+
+        const selCal = document.getElementById('filtroCalidadVenta'); selCal.innerHTML = '<option>Cargando...</option>'; selCal.disabled = true; $('#productoSelect').empty();
+
+        if(!famNombre) { selCal.innerHTML = '<option value="">-- Espere --</option>'; return; }
+
+        let fd = new FormData(); fd.append('familia', famNombre);
+
+        fetch('/api/calidades_de_familia', { method: 'POST', body: fd }).then(r => r.json()).then(data => {
+
+            selCal.innerHTML = '<option value="">-- Todas --</option>';
+
+            if(data.status === 'success') { data.calidades.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.text = c; selCal.appendChild(opt); }); selCal.disabled = false; }
+
+            cargarProductos();
+
+        });
+
+    }
+
+
+
+    function cargarProductos() {
+
+        const catId = $('#filtroFamiliaVenta').val(); const calFiltro = $('#filtroCalidadVenta').val();
+
+        const select = $('#productoSelect'); select.empty().append(new Option('Cargando...', '', false, false));
+
+        let url = catId ? `/api/productos_por_categoria/${catId}` : `/api/productos_por_categoria/0`; 
+
+        fetch(url).then(r => r.json()).then(data => {
+
+            select.empty().append(new Option('', '', true, true)); 
+
+            let lista = data.productos; if(calFiltro) lista = lista.filter(p => p.calidad === calFiltro);
+
+            if(lista.length === 0) select.empty().append(new Option('-- Vacío --', '', false, false));
+
+            else lista.forEach(p => { const o = new Option(p.nombre, p.id, false, false); $(o).attr({ 'data-sku': p.sku, 'data-stock': p.stock, 'data-punit': p.p_unidad }); select.append(o); });
+
+            select.val(null).trigger('change');
+
+        });
+
+    }
+
+
+
+    // --- NUEVAS FUNCIONES PARA DIRECTORIO DE CLIENTES ---
+
+
 
     function abrirDirectorioClientes() {
-        const modal = new bootstrap.Modal(document.getElementById('modalDirectorio')); modal.show();
-        fetch('/api/listar_todos_clientes').then(r => r.json()).then(res => {
-            const tbody = document.getElementById('bodyDirectorio'); tbody.innerHTML = '';
-            if(res.data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No hay clientes guardados aún.</td></tr>'; return; }
-            res.data.forEach(c => {
-                const nombreSafe = c.nombre.replace(/'/g, "&#39;"); const dirSafe = c.direccion.replace(/'/g, "&#39;"); const telSafe = c.telefono.replace(/'/g, "&#39;");
-                const badgeEst = c.estado === 'ACTIVO' ? '<span class="badge bg-success text-white" style="font-size:0.6rem">ACTIVO</span>' : '<span class="badge bg-danger" style="font-size:0.6rem">' + c.estado + '</span>';
-                tbody.insertAdjacentHTML('beforeend', `<tr><td class="fw-bold text-primary small">${c.documento}</td><td class="small text-truncate" style="max-width: 250px;">${c.nombre}</td><td class="d-none d-md-table-cell">${badgeEst}</td><td class="small text-muted" style="font-size: 0.75rem;">${c.updated_at || '-'}<br><span class="fst-italic">Por: ${c.updated_by || 'Sistema'}</span></td><td class="text-end"><button class="btn btn-sm btn-outline-primary fw-bold py-0" onclick="seleccionarClienteDeDirectorio('${c.documento}', '${nombreSafe}', '${dirSafe}', '${telSafe}', '${c.estado}', '${c.condicion}', '${c.updated_at || '-'}', '${c.updated_by || 'Sistema'}')"><i class="bi bi-check2-square"></i> Usar</button></td></tr>`);
-            });
-        }).catch(err => console.error(err));
+
+        const modal = new bootstrap.Modal(document.getElementById('modalDirectorio'));
+
+        modal.show();
+
+        
+
+        fetch('/api/listar_todos_clientes')
+
+            .then(r => r.json())
+
+            .then(res => {
+
+                const tbody = document.getElementById('bodyDirectorio');
+
+                tbody.innerHTML = '';
+
+                
+
+                if(res.data.length === 0) {
+
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No hay clientes guardados aún.</td></tr>';
+
+                    return;
+
+                }
+
+
+
+                res.data.forEach(c => {
+
+                    const nombreSafe = c.nombre.replace(/'/g, "&#39;");
+
+                    const dirSafe = c.direccion.replace(/'/g, "&#39;");
+
+                    const telSafe = c.telefono.replace(/'/g, "&#39;");
+
+                    // Preparamos datos de auditoría seguros
+
+                    const fechaAudit = c.updated_at || '-';
+
+                    const userAudit = c.updated_by || 'Sistema';
+
+
+
+                    const badgeEst = c.estado === 'ACTIVO' ? '<span class="badge bg-success text-white" style="font-size:0.6rem">ACTIVO</span>' : '<span class="badge bg-danger" style="font-size:0.6rem">' + c.estado + '</span>';
+
+                    
+
+                    const fila = `
+
+                        <tr>
+
+                            <td class="fw-bold text-primary small">${c.documento}</td>
+
+                            <td class="small text-truncate" style="max-width: 250px;">${c.nombre}</td>
+
+                            <td class="d-none d-md-table-cell">${badgeEst}</td>
+
+                            
+
+                            <td class="small text-muted" style="font-size: 0.75rem;">
+
+                                ${fechaAudit}<br>
+
+                                <span class="fst-italic">Por: ${userAudit}</span>
+
+                            </td>
+
+
+
+                            <td class="text-end">
+
+                                <button class="btn btn-sm btn-outline-primary fw-bold py-0" 
+
+                                    onclick="seleccionarClienteDeDirectorio('${c.documento}', '${nombreSafe}', '${dirSafe}', '${telSafe}', '${c.estado}', '${c.condicion}', '${fechaAudit}', '${userAudit}')">
+
+                                    <i class="bi bi-check2-square"></i> Usar
+
+                                </button>
+
+                            </td>
+
+                        </tr>
+
+                    `;
+
+                    tbody.insertAdjacentHTML('beforeend', fila);
+
+                });
+
+            })
+
+            .catch(err => console.error(err));
+
     }
+
+
 
     function filtrarTablaClientes() {
-        const filtro = document.getElementById('filtroDirectorio').value.toUpperCase(); const tr = document.getElementById('tablaClientes').getElementsByTagName('tr');
-        for (let i = 1; i < tr.length; i++) {
-            let tdRuc = tr[i].getElementsByTagName("td")[0]; let tdNom = tr[i].getElementsByTagName("td")[1];
-            if (tdRuc || tdNom) { tr[i].style.display = ((tdRuc.textContent || tdRuc.innerText).toUpperCase().indexOf(filtro) > -1 || (tdNom.textContent || tdNom.innerText).toUpperCase().indexOf(filtro) > -1) ? "" : "none"; }
+
+        const filtro = document.getElementById('filtroDirectorio').value.toUpperCase();
+
+        const tabla = document.getElementById('tablaClientes');
+
+        const tr = tabla.getElementsByTagName('tr');
+
+
+
+        for (let i = 1; i < tr.length; i++) { // Empezamos en 1 para saltar el header
+
+            let tdRuc = tr[i].getElementsByTagName("td")[0];
+
+            let tdNom = tr[i].getElementsByTagName("td")[1];
+
+            
+
+            if (tdRuc || tdNom) {
+
+                let txtRuc = tdRuc.textContent || tdRuc.innerText;
+
+                let txtNom = tdNom.textContent || tdNom.innerText;
+
+                
+
+                if (txtRuc.toUpperCase().indexOf(filtro) > -1 || txtNom.toUpperCase().indexOf(filtro) > -1) {
+
+                    tr[i].style.display = "";
+
+                } else {
+
+                    tr[i].style.display = "none";
+
+                }
+
+            }       
+
         }
+
     }
+
+
 
     function seleccionarClienteDeDirectorio(ruc, nombre, dir, tel, estado, condicion, fecha, usuario) {
-        if ($('#cli_doc_select').find("option[value='" + ruc + "']").length) { $('#cli_doc_select').val(ruc).trigger('change'); } else { $('#cli_doc_select').append(new Option(ruc + " - " + nombre, ruc, true, true)).trigger('change'); }
-        $('#cli_nom').val(nombre); $('#cli_dir').val(dir); $('#inputDireccionEntrega').val(dir); $('#cli_tel').val(tel);
-        actualizarBadges(estado, condicion); $('#hidden_estado').val(estado); $('#hidden_condicion').val(condicion);
-        $('#lbl_origen_datos').html(`<i class="bi bi-journal-bookmark-fill"></i> Directorio | <span class="text-primary">Act: ${fecha} (${usuario})</span>`);
-        bootstrap.Modal.getInstance(document.getElementById('modalDirectorio')).hide();
+
+        // 1. Crear opción en Select2
+
+        if ($('#cli_doc_select').find("option[value='" + ruc + "']").length) {
+
+            $('#cli_doc_select').val(ruc).trigger('change');
+
+        } else { 
+
+            var newOption = new Option(ruc + " - " + nombre, ruc, true, true);
+
+            $('#cli_doc_select').append(newOption).trigger('change');
+
+        }
+
+
+
+        // 2. Llenar campos
+
+        $('#cli_nom').val(nombre);
+
+        $('#cli_dir').val(dir);
+
+        $('#inputDireccionEntrega').val(dir);
+
+        $('#cli_tel').val(tel);
+
+        
+
+        // 3. Badges y Hiddens
+
+        actualizarBadges(estado, condicion);
+
+        $('#hidden_estado').val(estado);
+
+        $('#hidden_condicion').val(condicion);
+
+        
+
+        // 4. CORRECCIÓN: MOSTRAR INFO REAL EN LUGAR DE SOLO "DIRECTORIO"
+
+        let infoAudit = `Act: ${fecha} (${usuario})`;
+
+        $('#lbl_origen_datos').html(`<i class="bi bi-journal-bookmark-fill"></i> Directorio | <span class="text-primary">${infoAudit}</span>`);
+
+
+
+        // 5. Cerrar modal
+
+        const modalEl = document.getElementById('modalDirectorio');
+
+        const modal = bootstrap.Modal.getInstance(modalEl);
+
+        modal.hide();
+
     }
 
-    // --- UTILIDADES ---
-    function filtroTeclas(event, tipo) { if ([8, 9, 37, 39, 13, 46].includes(event.keyCode)) return true; if (['-','+','e','E'].includes(event.key)) return false; if (tipo === 'entero' && event.key === '.') return false; return true; }
-    function validarEntradaString(input, decimalesMax) { let val = input.value.toString(); if (val.indexOf('.') >= 0) { let parts = val.split('.'); if (parts[1].length > decimalesMax) input.value = parts[0] + '.' + parts[1].substring(0, decimalesMax); } if (input.value !== "" && parseFloat(input.value) < 0) input.value = Math.abs(parseFloat(input.value)); if(input.id === 'cantidadInput' || input.id === 'precioManualInput') calcularSubtotalPrevio(); }
-    function limpiarInputPrecio(input) { let val = parseFloat(input.value); input.value = !isNaN(val) ? (val < 0 ? 0 : parseFloat(val.toFixed(4))) : 0; if(input.onchange) input.onchange(); }
-    function limpiarInputCantidad(input) { let val = parseFloat(input.value); input.value = !isNaN(val) ? (val < 1 ? 1 : Math.floor(val)) : 1; if(input.onchange) input.onchange(); }
-    function calcularSubtotalPrevio() { const cant = parseFloat($('#cantidadInput').val()) || 0; const precio = parseFloat($('#precioManualInput').val()) || 0; let simbolo = ($('#selectMoneda').val() === 'PEN') ? 'S/' : '$'; $('#txt_subtotal_previo').text(`${simbolo} ${(cant * precio).toFixed(2)}`); }
-    function calcularPrecioUnitarioVisual() { let precioBase = parseFloat($('#precioBaseHidden').val()) || 0; let moneda = $('#selectMoneda').val(); let tc = parseFloat($('#inputTC').val()) || 1; let precioFinal = (moneda === 'PEN') ? (precioBase * tc) : precioBase; $('#precioManualInput').val(parseFloat(precioFinal.toFixed(6))); calcularSubtotalPrevio(); }
 </script>
+
 {% endblock %}
