@@ -1715,38 +1715,162 @@
     }
 
     function aplicarCambioMonedaReal(moneda, factorTC) {
+
+
+
         // Actualizar visuales
+
+
+
         actualizarSimbolosVisuales(moneda);
 
+
+
+
+
+
+
         // Actualizar datos del array
-        carrito.forEach(item => { 
-            let precio_puro = (moneda === 'PEN') ? (item.precioBase * factorTC) : item.precioBase;
-            
-            // Reaplicar descuento individual si lo tiene
-            if (item.desc_valor > 0) {
-                if (item.desc_tipo === '%') {
-                    item.precio = precio_puro * (1 - (item.desc_valor / 100));
-                } else {
-                    // Convertir el monto de descuento a la nueva moneda
-                    let desc_monto_base = (moneda === 'PEN') ? (item.desc_valor * factorTC) : (item.desc_valor / factorTC); 
-                    item.precio = precio_puro - desc_monto_base;
-                    if (item.precio < 0) item.precio = 0;
-                }
+
+
+
+        carrito.forEach(item => {
+
+
+
+            if(moneda === 'PEN') {
+
+
+
+                // Multiplicamos el Precio Base (USD) por el TC
+
+
+
+                item.precio = parseFloat((item.precioBase * factorTC).toFixed(6));
+
+
+
             } else {
-                item.precio = precio_puro;
+
+
+
+                // Restauramos el Precio Base original
+
+
+
+                item.precio = item.precioBase;
+
+
+
             }
-            
-            item.precio = parseFloat(item.precio.toFixed(6));
-            item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100; 
+
+
+
+            // Recalculamos subtotal
+
+
+
+            item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+
+
+
         });
 
+
+
+
+
+
+
         // Redibujar tabla y mostrar Badge Amarillo si es Soles
+
+
+
         renderizarTabla();
-        
+
+
+
+       
+
+
+
         if (moneda === 'PEN') actualizarBadgeVisualTC(factorTC);
+
+
+
         else actualizarBadgeVisualTC(null);
+
+
+
     }
 
+
+
+
+
+
+
+        // C. CAMBIO A SOLES (Automático con aviso)
+
+
+
+        if (nuevaMoneda === 'PEN') {
+
+
+
+            // Pequeña confirmación visual (Toast) o Ventana informativa
+
+
+
+            Swal.fire({
+
+
+
+                title: 'Convirtiendo a Soles',
+
+
+
+                text: `Se aplicará el T.C. SUNAT: ${tcSunat.toFixed(3)}`,
+
+
+
+                icon: 'info',
+
+
+
+                timer: 2000,
+
+
+
+                showConfirmButton: false,
+
+
+
+                backdrop: `rgba(0,0,123,0.1)` // Fondo suave
+
+
+
+            });
+
+
+
+           
+
+
+
+            aplicarCambioMonedaReal('PEN', tcSunat);
+
+
+
+            monedaAnterior = 'PEN';
+
+
+
+        }
+
+
+
+    }
 
 
 
