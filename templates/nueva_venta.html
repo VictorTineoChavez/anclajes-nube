@@ -1675,45 +1675,6 @@
 
         }
 
-
-    function iniciarCambioMoneda(selectElement) {
-        const nuevaMoneda = selectElement.value;
-        const tcSunat = parseFloat($('#inputTC').val()) || 1; // Toma el valor del input READONLY
-        
-        // A. SI EL CARRITO ESTÁ VACÍO (Solo cambio visual)
-        if (carrito.length === 0) {
-            actualizarSimbolosVisuales(nuevaMoneda);
-            monedaAnterior = nuevaMoneda;
-            // Manejo del Badge Amarillo
-            if (nuevaMoneda === 'PEN') actualizarBadgeVisualTC(tcSunat);
-            else actualizarBadgeVisualTC(null);
-            return;
-        }
-
-        // B. CAMBIO A DÓLARES (Restaurar)
-        if (nuevaMoneda === 'USD') {
-            aplicarCambioMonedaReal('USD', 1);
-            monedaAnterior = 'USD';
-            return;
-        }
-
-        // C. CAMBIO A SOLES (Automático con aviso)
-        if (nuevaMoneda === 'PEN') {
-            // Pequeña confirmación visual (Toast) o Ventana informativa
-            Swal.fire({
-                title: 'Convirtiendo a Soles',
-                text: `Se aplicará el T.C. SUNAT: ${tcSunat.toFixed(3)}`,
-                icon: 'info',
-                timer: 2000,
-                showConfirmButton: false,
-                backdrop: `rgba(0,0,123,0.1)` // Fondo suave
-            });
-            
-            aplicarCambioMonedaReal('PEN', tcSunat);
-            monedaAnterior = 'PEN';
-        }
-    }
-
     function aplicarCambioMonedaReal(moneda, factorTC) {
 
 
