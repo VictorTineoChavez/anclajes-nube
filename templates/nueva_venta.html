@@ -3369,224 +3369,106 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
 
 // --- FUNCIÓN RENDERIZAR TABLA COMPLETA Y OPTIMIZADA ---
 
-    function renderizarTabla() {
-
+function renderizarTabla() {
         const tbody = $('#tablaCarrito'); 
-
         tbody.empty();
-
         
-
         let moneda = $('#selectMoneda').val(); 
-
         let simbolo = (moneda === 'PEN') ? 'S/' : '$';
-
-
-
-        // Mostrar u ocultar mensaje de carrito vacío
 
         if(carrito.length > 0) $('#msgVacio').hide(); else $('#msgVacio').show();
 
-
-
         carrito.forEach((item, index) => {
-
-            // 1. LÓGICA DE BADGES (ETIQUETAS) Y STOCK
-
-            let claseStock = ''; 
-
-            let badgeDisplay = 'none';
-
-            let textoBadge = '';
-
+            let claseStock = ''; let badgeDisplay = 'none'; let textoBadge = '';
             
-
-            // A. Validación Stock Producto Simple
-
             if (item.tipo === 'PRODUCTO') {
-
                 if (item.cantidad > item.stock) {
-
-                    claseStock = 'stock-insuficiente'; // Clase CSS para pintar rojo el input
-
-                    badgeDisplay = 'inline-block';
-
-                    textoBadge = `Sin Stock (Max: ${item.stock})`;
-
+                    claseStock = 'stock-insuficiente'; badgeDisplay = 'inline-block'; textoBadge = `Sin Stock (Max: ${item.stock})`;
                 }
-
-            } 
-
-            // B. Validación Stock Kit (GLB) - Opcional pero recomendado
-
-            else if (item.tipo === 'GLB' && item.componentes) {
-
-                // Verificamos si algún componente interno falta
-
+            } else if (item.tipo === 'GLB' && item.componentes) {
                 let componenteFaltante = item.componentes.some(c => (c.qty * item.cantidad) > c.stock_individual);
-
                 if (componenteFaltante) {
-
-                    claseStock = 'stock-insuficiente';
-
-                    badgeDisplay = 'inline-block';
-
-                    textoBadge = `Componentes sin Stock`;
-
+                    claseStock = 'stock-insuficiente'; badgeDisplay = 'inline-block'; textoBadge = `Componentes sin Stock`;
                 }
-
             }
-
-
-
-            // 2. ETIQUETAS DE TIPO (FAB / KIT) Y UNIDAD MEDIDA
 
             let umVisual = item.um || (item.tipo === 'PRODUCTO' ? 'UND' : (item.tipo === 'FABRICACION' ? 'SRV' : 'GLB'));
+            let etiquetaTipo = ''; let botonVer = ''; 
 
-            let etiquetaTipo = '';
-
-            let botonVer = ''; // Botón para ver contenido del Kit
-
-
-
-            if(item.tipo === 'FABRICACION') {
-
-                etiquetaTipo = '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">FAB</span>';
-
-            }
-
-            
-
+            if(item.tipo === 'FABRICACION') etiquetaTipo = '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">FAB</span>';
             if(item.tipo === 'GLB') { 
-
                 etiquetaTipo = '<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">KIT</span>'; 
-
-                // El ojo se pone rojo si falta stock en el kit
-
                 let colorOjo = (claseStock !== '') ? 'btn-danger' : 'btn-outline-info';
-
                 botonVer = `<button class="btn btn-sm ${colorOjo} me-1" onclick="verComponentes(${index})" title="Ver contenido"><i class="bi bi-eye-fill"></i></button>`;
-
             }
 
-
-
-            // 3. CONSTRUCCIÓN DEL HTML DE LA FILA
+            // Lógica de Precio Tachado (Descuento)
+            let precioTachadoHtml = '';
+            let inputClass = 'editable-cell';
+            
+            if (item.desc_valor > 0) {
+                let tc_actual = parseFloat($('#inputTC').val()) || 1;
+                let precioOriginal = (moneda === 'PEN') ? (item.precioBase * tc_actual) : item.precioBase;
+                precioTachadoHtml = `<del class="text-muted d-block" style="font-size: 0.75rem; margin-bottom: -2px;">${precioOriginal.toFixed(2)}</del>`;
+                inputClass = 'editable-cell text-danger fw-bold border-danger bg-danger bg-opacity-10'; 
+            }
 
             tbody.append(`
-
                 <tr id="fila-${index}">
-
                     <td class="ps-3">
-
                         <div class="product-name-cell" style="font-size: 0.85rem;">
-
                             ${item.nombre} ${etiquetaTipo} <br> <span class="badge bg-danger mt-1">${item.desc_label}</span>
-
                         </div>
-
                         <div class="small text-muted fw-light">${item.sku}</div>
-
                         <span class="badge bg-danger ms-1" style="font-size:0.6rem; display:${badgeDisplay};">
-
                             <i class="bi bi-exclamation-triangle-fill"></i> ${textoBadge}
-
                         </span>
-
                     </td>
-
-
 
                     <td class="text-center small text-muted fw-bold pt-3">${umVisual}</td>
-
                     
-
-                    <td class="text-center">
-
+                    <td class="text-center pt-3">
                         <input type="number" id="input_cant_${index}" 
-
                                class="editable-cell text-center ${claseStock}" 
-
                                style="width: 70px;" value="${item.cantidad}" min="1" step="1"
-
                                onkeydown="return evitarNegativos(event)"
-
                                oninput="actualizarFilaSinRedibujar(${index}, 'cant', this.value)">
-
                     </td>
 
-
-
-                    <td class="text-end">
-
+                    <td class="text-end pt-2">
+                        ${precioTachadoHtml}
                         <input type="number" id="input_precio_${index}" 
-
-                               class="editable-cell" 
-
+                               class="${inputClass}" 
                                style="width: 90px;" value="${item.precio}" min="0" step="any"
-
                                onkeydown="return evitarNegativos(event)"
-
-                               oninput="actualizarFilaSinRedibujar(${index}, 'precio', this.value)">
-
+                               onchange="actualizarFilaManual(${index}, this.value)">
                     </td>
-
-
 
                     <td class="text-end fw-bold text-dark small pt-3">
-
                         ${simbolo} <span id="lbl_subtotal_${index}">${item.subtotal.toFixed(2)}</span>
-
                     </td>
 
-
-
-                    <td class="text-center text-nowrap pt-2">
-
+                    <td class="text-center text-nowrap pt-3">
                         ${botonVer}
-
                         <button class="btn btn-sm btn-outline-warning border-0" onclick="aplicarDescuentoItem(${index})" title="Aplicar Descuento a este Item">
-
                             <i class="bi bi-percent"></i>
-
                         </button>
-
                         <button class="btn btn-sm btn-outline-danger border-0" onclick="eliminarFila(${index})" title="Eliminar ítem">
-
                             <i class="bi bi-trash"></i>
-
                         </button>
-
                     </td>
-
                 </tr>
-
             `);
-
         });
 
-
-
-        // 4. ACTUALIZAR TOTALES FINALES
-
         actualizarTotalesGlobales();
-
         
-
-        // 5. ACTUALIZAR BADGE DE T.C. VISUAL (Si es Soles)
-
         const tcActual = parseFloat($('#inputTC').val()) || 0;
-
         if(moneda === 'PEN') {
-
             actualizarBadgeVisualTC(tcActual);
-
         } else {
-
-            actualizarBadgeVisualTC(null); // Ocultar
-
+            actualizarBadgeVisualTC(null);
         }
-
     }
 
 
