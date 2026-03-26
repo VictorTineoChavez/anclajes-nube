@@ -1290,6 +1290,124 @@
     let monedaAnterior = 'USD'; // Variable para recordar estado anterior si cancela}
 
 
+    // --- LÓGICA DE DESCUENTOS ---
+    window.actualizarFilaManual = function(index, valor) {
+        let val = parseFloat(valor);
+        if (isNaN(val) || val < 0) val = 0;
+        let item = carrito[index];
+        item.precio = val;
+        // Si escribe manualmente, borramos el descuento visual para no confundir
+        item.desc_tipo = ''; item.desc_valor = 0; item.desc_label = '';
+        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+        renderizarTabla(); 
+    };
+
+    window.aplicarDescuentoItem = function(index) {
+        let item = carrito[index];
+        let moneda = $('#selectMoneda').val();
+        let simbolo = moneda === 'PEN' ? 'S/' : '$';
+
+        Swal.fire({
+            title: 'Descuento al Producto',
+            html: `
+                <div class="text-start small text-muted mb-2">${item.nombre}</div>
+                <select id="swal-desc-tipo" class="form-select mb-2">
+                    <option value="%">Porcentaje (%)</option>
+                    <option value="MONTO">Monto Directo c/u (${simbolo})</option>
+                </select>
+                <input id="swal-desc-valor" type="number" class="form-control" placeholder="Ej: 10" min="0" step="any">
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Aplicar',
+            cancelButtonText: 'Quitar Descuento',
+            confirmButtonColor: '#198754',
+        }).then(res => {
+            let tc = parseFloat($('#inputTC').val()) || 1;
+            let precioRealSinDesc = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
+
+            if (res.isConfirmed) {
+                let tipo = document.getElementById('swal-desc-tipo').value;
+                let valor = parseFloat(document.getElementById('swal-desc-valor').value) || 0;
+
+                if (valor > 0) {
+                    if (tipo === 'MONTO' && valor >= precioRealSinDesc) {
+                        return Swal.fire('Error', `El descuento (${simbolo}${valor}) no puede ser mayor o igual al precio original (${simbolo}${precioRealSinDesc.toFixed(2)}).`, 'error');
+                    }
+                    item.desc_tipo = tipo; item.desc_valor = valor;
+                    if (tipo === '%') {
+                        if (valor >= 100) return Swal.fire('Error', 'No puede descontar el 100%.', 'error');
+                        item.precio = precioRealSinDesc * (1 - (valor / 100));
+                        item.desc_label = `Desc: -${valor}%`;
+                    } else {
+                        item.precio = precioRealSinDesc - valor;
+                        item.desc_label = `Desc: -${simbolo}${valor} c/u`;
+                    }
+                }
+            } else if (res.dismiss === Swal.DismissReason.cancel) {
+                item.desc_tipo = ''; item.desc_valor = 0; item.desc_label = '';
+                item.precio = precioRealSinDesc;
+            }
+            item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+            renderizarTabla();
+        });
+    };
+
+    window.aplicarDescuentoMasivo = function() {
+        if (carrito.length === 0) return Swal.fire('Carrito Vacío', 'Agregue productos primero.', 'warning');
+        let moneda = $('#selectMoneda').val();
+        let simbolo = moneda === 'PEN' ? 'S/' : '$';
+
+        Swal.fire({
+            title: 'Descuento a Toda la Lista',
+            html: `
+                <div class="text-start small text-muted mb-2">Aplica a cada unidad de todos los productos:</div>
+                <select id="swal-desc-tipo-masivo" class="form-select mb-2">
+                    <option value="%">Porcentaje (%)</option>
+                    <option value="MONTO">Monto Directo c/u (${simbolo})</option>
+                </select>
+                <input id="swal-desc-valor-masivo" type="number" class="form-control border-warning" placeholder="Ej: 5" min="0" step="any">
+                <div class="form-text small mt-2 text-danger"><i class="bi bi-exclamation-circle"></i> Sobreescribirá descuentos previos.</div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Aplicar a Todos',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#ffc107',
+        }).then(res => {
+            if (res.isConfirmed) {
+                let tipo = document.getElementById('swal-desc-tipo-masivo').value;
+                let valor = parseFloat(document.getElementById('swal-desc-valor-masivo').value) || 0;
+                let tc = parseFloat($('#inputTC').val()) || 1;
+                
+                if (valor > 0) {
+                    carrito.forEach(item => {
+                        let precioRealSinDesc = (moneda === 'PEN') ? (item.precioBase * tc) : item.precioBase;
+                        if (tipo === 'MONTO' && valor >= precioRealSinDesc) {
+                            item.precio = 0.01; item.desc_tipo = 'MONTO'; item.desc_valor = (precioRealSinDesc - 0.01);
+                            item.desc_label = `Límite alcanzado`;
+                        } else if (tipo === '%' && valor >= 100) {
+                            item.precio = 0.01; item.desc_tipo = '%'; item.desc_valor = 99.9;
+                            item.desc_label = `Límite alcanzado`;
+                        } else {
+                            item.desc_tipo = tipo; item.desc_valor = valor;
+                            if (tipo === '%') {
+                                item.precio = precioRealSinDesc * (1 - (valor / 100));
+                                item.desc_label = `Desc Masivo: -${valor}%`;
+                            } else {
+                                item.precio = precioRealSinDesc - valor;
+                                item.desc_label = `Desc Masivo: -${simbolo}${valor} c/u`;
+                            }
+                        }
+                        item.precio = parseFloat(item.precio.toFixed(6));
+                        item.subtotal = Math.round((item.cantidad * item.precio + Number.EPSILON) * 100) / 100;
+                    });
+                    renderizarTabla();
+                    Swal.fire({toast:true, position:'top-end', icon:'success', title:'Descuento Masivo Aplicado', showConfirmButton:false, timer:2000});
+                }
+            }
+        });
+    };
+
+
 
 
 
