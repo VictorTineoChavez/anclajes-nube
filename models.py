@@ -98,6 +98,20 @@ class Order(db.Model):
     observacion = db.Column(db.Text) # Nota del Vendedor (Logística)
     motivo_rechazo = db.Column(db.Text) # Nota del Gerente (Rechazo)
 
+    # --- RASTREO Y LÍNEA DE TIEMPO (NUEVOS CAMPOS) ---
+    cliente_confirmado = db.Column(db.Boolean, default=False)
+    fecha_confirmacion_cliente = db.Column(db.DateTime, nullable=True)
+    
+    fecha_verificacion_almacen = db.Column(db.DateTime, nullable=True)
+    almacenero_nombre = db.Column(db.String(100), nullable=True)
+    
+    fecha_aprobacion = db.Column(db.DateTime, nullable=True) # (Si ya lo tenías, déjalo)
+    gerente_nombre = db.Column(db.String(100), nullable=True)
+
+    agencia = db.Column(db.String(150), nullable=True)
+    control_calidad = db.Column(db.String(2), default='NO') # Guardará 'SI' o 'NO'
+    penalidad = db.Column(db.String(2), default='NO')       # Guardará 'SI' o 'NO'
+
     # --- DATOS MONETARIOS ---
     moneda = db.Column(db.String(5), default='PEN') 
     tipo_cambio = db.Column(db.Float, default=1.0)  

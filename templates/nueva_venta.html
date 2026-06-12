@@ -146,679 +146,355 @@
 
 </div>
 
-
-
 <div class="row g-3">
-
-    <div class="col-lg-5 col-md-12">
-
+    <div class="col-lg-4 col-md-12 d-flex flex-column gap-3">
         
-
-        <div class="card shadow-sm mb-3 border-0">
-
+        <div class="card shadow-sm border-0 m-0">
             <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
-
                 <h6 class="mb-0 small fw-bold"><i class="bi bi-person-vcard"></i> 1. Cliente</h6>
-
                 <div>
-
                     <button class="btn btn-sm btn-light text-dark py-0 me-1 fw-bold shadow-sm" onclick="window.abrirDirectorioClientes()" title="Ver lista de todos los clientes">
-
-                        <i class="bi bi-journal-bookmark-fill text-primary"></i> Directorio / Historial
-
+                        <i class="bi bi-journal-bookmark-fill text-primary"></i> Directorio
                     </button>
-
-                    
-
                     <button class="btn btn-sm btn-info text-primary py-0" onclick="window.guardarSoloCliente()" title="Guardar cambios de contacto">
-
-                        <i class="bi bi-save"></i> Guardar Contacto
-
+                        <i class="bi bi-save"></i> Guardar
                     </button>
-
                 </div>
-
             </div>
-
             <div class="card-body bg-light">
-
                 <div class="row g-2">
-
-                    <div class="col-md-6 col-12">
-
+                    <div class="col-12">
                         <label class="small text-muted mb-1">RUC / DNI *</label>
-
                         <div class="d-flex align-items-center w-100">
-
                             <div style="flex-grow: 1; min-width: 0;"> 
-
-                                <select id="cli_doc_select" style="width: 100%;">
-
-                                    <option></option>
-
-                                </select>
-
+                                <select id="cli_doc_select" style="width: 100%;"><option></option></select>
                             </div>
-
-                            <button class="btn btn-dark btn-sm ms-1" type="button" id="btnBuscarSunat" onclick="window.buscarClienteApi(false)" title="Consultar SUNAT">
-
-                                <i class="bi bi-search"></i>
-
-                            </button>
-
-                            <button class="btn btn-outline-danger btn-sm ms-1" type="button" onclick="window.confirmarForzado()" title="Forzar actualización">
-
-                                <i class="bi bi-cloud-arrow-down-fill"></i>
-
-                            </button>
-
+                            <button class="btn btn-dark btn-sm ms-1" type="button" id="btnBuscarSunat" onclick="window.buscarClienteApi(false)" title="Consultar SUNAT"><i class="bi bi-search"></i></button>
+                            <button class="btn btn-outline-danger btn-sm ms-1" type="button" onclick="window.confirmarForzado()" title="Forzar actualización"><i class="bi bi-cloud-arrow-down-fill"></i></button>
                         </div>
-
                     </div>
-
-                    <div class="col-md-6 col-12">
-
-                        <label class="small text-muted mb-1">Teléfono (Editable)</label>
-
-                        <input type="text" id="cli_tel" class="form-control form-control-sm border-success" placeholder="Ingrese teléfono...">
-
-                    </div>
-
                     <div class="col-12">
-
                         <label class="small text-muted mb-1">Nombre / Razón Social</label>
-
                         <input type="text" id="cli_nom" class="form-control form-control-sm bg-white fw-bold" readonly>
-
                     </div>
-
                     <div class="col-12">
-
                         <label class="small text-muted mb-1">Dirección Fiscal (SUNAT)</label>
-
                         <input type="text" id="cli_dir" class="form-control form-control-sm bg-white" readonly>
-
                     </div>
-
                     <div class="col-6">
-
+                        <label class="small text-muted mb-1">Teléfono (Editable)</label>
+                        <input type="text" id="cli_tel" class="form-control form-control-sm border-success" placeholder="Ingrese teléfono...">
+                    </div>
+                    <div class="col-6">
                         <label class="small text-muted mb-1">Atención (Contacto)</label>
-
                         <input type="text" id="cli_atte" class="form-control form-control-sm" placeholder="Ej: Sr. Juan">
-
                     </div>
-
-                    <div class="col-6">
-
-                        <label class="small text-muted mb-1">O/C (Opcional)</label>
-
+                    <div class="col-12">
+                        <label class="small text-muted mb-1">O/C Cliente (Opcional)</label>
                         <input type="text" id="cli_oc" class="form-control form-control-sm" placeholder="N° Orden Compra">
-
                     </div>
-
                     
-
                     <input type="hidden" id="hidden_estado">
-
                     <input type="hidden" id="hidden_condicion">
 
-
-
                     <div class="col-12 d-flex gap-2 mt-1 align-items-center">
-
                         <span id="badge_estado" class="badge bg-secondary opacity-50">Estado: -</span>
-
                         <span id="badge_condicion" class="badge bg-secondary opacity-50">Condición: -</span>
-
                         <small class="text-muted ms-auto fst-italic" id="lbl_origen_datos" style="font-size: 0.7rem;"></small>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
-
-
-        <div class="card shadow-sm mb-3 border-0">
-
-            <div class="card-header bg-secondary text-white py-2 d-flex justify-content-between align-items-center">
-
-                <h6 class="mb-0 small fw-bold"><i class="bi bi-box-seam"></i> 2. Agregar Item</h6>
-
-                <div class="btn-group btn-group-sm" role="group">
-
-                    <input type="radio" class="btn-check" name="modeOption" id="modeProd" autocomplete="off" checked onclick="cambiarModo('PRODUCTO')">
-
-                    <label class="btn btn-outline-light" for="modeProd">Producto</label>
-
-            
-
-                    <input type="radio" class="btn-check" name="modeOption" id="modeFab" autocomplete="off" onclick="cambiarModo('FABRICACION')">
-
-                    <label class="btn btn-outline-light" for="modeFab">Fabricación</label>
-
-            
-
-                    <input type="radio" class="btn-check" name="modeOption" id="modeGlb" autocomplete="off" onclick="cambiarModo('GLB')">
-
-                    <label class="btn btn-outline-light" for="modeGlb">Armado (GLB)</label>
-
-                </div>
-
-            </div>
-
-
-
-            <div class="card-body">
-
-                <div id="panelProducto">
-
-                    <div class="row g-2 mb-2">
-
-                        <div class="col-6">
-
-                            <label class="small text-muted mb-1 fw-bold">1. Familia</label>
-
-                            <select class="form-select form-select-sm" id="filtroFamiliaVenta" onchange="window.cargarCalidadesVenta()">
-
-                                <option value="" selected>-- Seleccione --</option>
-
-                                {% for c in categorias %} <option value="{{ c.id }}" data-nombre="{{ c.nombre }}">{{ c.nombre }}</option> {% endfor %}
-
-                            </select>
-
-                        </div>
-
-                        <div class="col-6">
-
-                            <label class="small text-muted mb-1 fw-bold">2. Calidad</label>
-
-                            <select class="form-select form-select-sm" id="filtroCalidadVenta" disabled onchange="window.cargarProductos()">
-
-                                <option value="">-- Espere familia --</option>
-
-                            </select>
-
-                        </div>
-
-                    </div>
-
-                    <div class="mb-3">
-
-                        <label class="small text-muted mb-1 fw-bold">3. Buscar Producto</label>
-
-                        <select class="form-select" id="productoSelect" style="width: 100%;">
-
-                            <option value="" disabled selected>Escriba para buscar...</option>
-
-                        </select>
-
-                    </div>
-
-                </div>
-
-
-
-                <div id="panelFabricacion" class="d-none">
-
-                    <div class="row g-2 mb-3 align-items-end">
-
-                        <div class="col-md-5">
-
-                            <label class="small fw-bold text-muted">1. Tipo de Servicio</label>
-
-                            <div class="input-group input-group-sm">
-
-                                <select id="selTipoServicio" class="form-select fw-bold text-primary">
-
-                                    <option value="SRV-GEN" data-titulo="SERVICIO GENERAL">-- CARGANDO --</option>
-
-                                </select>
-
-                                <button class="btn btn-outline-success" type="button" onclick="abrirModalNuevoServicio()" title="Crear Nuevo Tipo">
-
-                                    <i class="bi bi-plus-lg"></i>
-
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-7">
-
-                            <label class="small fw-bold text-muted">2. Descripción (EETT)</label>
-
-                            <textarea id="fabDesc" class="form-control form-control-sm text-uppercase" rows="2" 
-
-                                placeholder="Ej: ARANDELA PLANA..."></textarea>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            
-
-                <div id="panelGLB" class="d-none">
-
-                    <div class="alert alert-info small mb-3 p-2">
-
-                        <i class="bi bi-tools"></i> <strong>Modo Armado:</strong> Cree un item compuesto por varios productos.
-
-                    </div>
-
-                    <button class="btn btn-outline-dark w-100 mb-3" onclick="abrirModalGLB()">
-
-                        <i class="bi bi-layers-half"></i> Configurar Kit / Armado
-
-                    </button>
-
-                    <div id="glbPreview" class="small text-muted fst-italic text-center border rounded p-2 bg-light">Ningún kit configurado aún.</div>
-
-                </div>
-
-
-
-                <div class="row g-2 mb-2 align-items-end mt-2">
-
-                    <div class="col-3">
-
-                        <label class="small text-muted">Stock</label>
-
-                        <input type="text" id="info_stock" class="form-control form-control-sm bg-light fw-bold text-center" readonly>
-
-                    </div>
-
-                    <div class="col-3">
-
-                        <label class="small text-muted fw-bold">Cant.</label>
-
-                        <input type="number" id="cantidadInput" class="form-control form-control-sm border-primary fw-bold text-center" 
-
-                               value="1" min="1" 
-
-                               onkeydown="return filtroTeclas(event, 'entero')"
-
-                               oninput="validarEntradaString(this, 0)">
-
-                    </div>
-
-                    <div class="col-6">
-
-                        <label class="small text-muted fw-bold text-primary">Precio Unit (<span id="lblMonedaUnit">USD</span>)</label>
-
-                        <div class="input-group input-group-sm">
-
-                            <span class="input-group-text" id="simboloMonedaInput">$</span>
-
-                            <input type="number" id="precioManualInput" class="form-control fw-bold text-end" 
-
-                                   step="any" 
-
-                                   onkeydown="return filtroTeclas(event, 'decimal')"
-
-                                   oninput="validarEntradaString(this, 6)">
-
-                            <input type="hidden" id="precioBaseHidden"> 
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-
-                <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded border mb-2">
-
-                    <small class="text-muted">Total Línea:</small>
-
-                    <strong class="text-dark fs-5" id="txt_subtotal_previo">$ 0.00</strong>
-
-                </div>
-
-
-
-                <button class="btn btn-success w-100 btn-sm fw-bold py-2" id="btnAgregar" disabled>
-
-                    <i class="bi bi-plus-lg"></i> AGREGAR A LA LISTA
-
-                </button>
-
-            </div>
-
-        </div>
-
-
-
-        <div class="card shadow-sm border-0 mb-3">
-
+        <div class="card shadow-sm border-0 m-0">
             <div class="card-header bg-light py-2">
-
                 <h6 class="mb-0 small fw-bold text-dark"><i class="bi bi-truck"></i> 3. Datos de Entrega</h6>
-
             </div>
-
             <div class="card-body py-2">
-
                 <div class="row g-2 align-items-center">
-
-                <div class="col-6">
-
-                    <label class="small fw-bold">Fecha Entrega</label>
-
-                    <div class="input-group input-group-sm">
-
-                        <input type="date" id="inputFechaEntrega" class="form-control border-warning">
-
-                        <span class="input-group-text bg-white text-muted" title="Limpiar" style="cursor:pointer" onclick="document.getElementById('inputFechaEntrega').value = ''">
-
-                            <i class="bi bi-x"></i>
-
-                        </span>
-
+                    <div class="col-6">
+                        <label class="small fw-bold">Fecha Entrega</label>
+                        <div class="input-group input-group-sm">
+                            <input type="date" id="inputFechaEntrega" class="form-control border-warning">
+                            <span class="input-group-text bg-white text-muted" title="Limpiar" style="cursor:pointer" onclick="document.getElementById('inputFechaEntrega').value = ''"><i class="bi bi-x"></i></span>
+                        </div>
+                        <div class="form-text fst-italic text-muted" style="font-size: 0.7rem;">Si se deja vacío: <strong>"A COORDINAR"</strong></div>
+                    </div>
+                    <div class="col-6">
+                        <label class="small">Tipo Entrega</label>
+                        <select class="form-select form-select-sm" id="selectEntrega" onchange="window.toggleDireccionEntrega()">
+                            <option value="Recojo">Recojo Tienda</option>
+                            <option value="Envio">Envío Domicilio/Obra</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-12" id="divDireccionEntrega" style="display: none;">
+                        <label class="small fw-bold text-primary">Dirección de Envío</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="bi bi-geo-alt-fill text-danger"></i></span>
+                            <input type="text" id="inputDireccionEntrega" class="form-control form-control-sm border-primary" placeholder="Confirme o edite la dirección...">
+                        </div>
                     </div>
 
-                    <div class="form-text fst-italic text-muted" style="font-size: 0.7rem;">
-
-                        <i class="bi bi-info-circle"></i> Si se deja vacío, saldrá: <strong>"A COORDINAR"</strong>
-
+                    <!-- NUEVO: SELECTOR DE AGENCIA INTELIGENTE -->
+                    <div class="col-6 mt-2">
+                        <label class="small fw-bold text-dark">¿Agencia?</label>
+                        <select id="selectReqAgencia" class="form-select form-select-sm border-secondary" onchange="window.toggleAgencia()">
+                            <option value="NO" selected>❌ NO</option>
+                            <option value="SI">✅ SÍ</option>
+                        </select>
                     </div>
-
+                    <div class="col-6 mt-2" id="divNombreAgencia" style="display: none;">
+                        <label class="small fw-bold text-primary">Nombre Agencia *</label>
+                        <input type="text" id="inputAgencia" class="form-control form-control-sm border-primary" placeholder="Ej: Shalom, Marvisur...">
+                    </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 m-0">
+            <div class="card-header bg-light py-2">
+                <h6 class="mb-0 small fw-bold text-dark"><i class="bi bi-sliders"></i> 4. Condiciones Comerciales</h6>
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted">Condición de Pago</label>
+                        <select id="inputCondicionPago" class="form-select form-select-sm">
+                            <option value="Contado">Contado</option>
+                            <option value="Contra-entrega">Contra-entrega</option>
+                            <option value="Crédito 7 días">Crédito 7 días</option>
+                            <option value="Crédito 15 días">Crédito 15 días</option>
+                            <option value="Crédito 30 días">Crédito 30 días</option>
+                            <option value="Factura Negociable">Factura Negociable</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted">Validez Oferta</label>
+                        <select id="inputValidez" class="form-select form-select-sm">
+                            <option value="5 días">5 días</option>
+                            <option value="7 días">7 días</option>
+                            <option value="15 días">15 días</option>
+                            <option value="30 días">30 días</option>
+                        </select>
+                    </div>
 
                     <div class="col-6">
-
-                        <label class="small">Tipo Entrega</label>
-
-                        <select class="form-select form-select-sm" id="selectEntrega" onchange="window.toggleDireccionEntrega()">
-
-                            <option value="Recojo">Recojo Tienda</option>
-
-                            <option value="Envio">Envío Domicilio/Obra</option>
-
+                        <label class="small fw-bold text-primary"> Certificado de Calidad</label>
+                        <select id="inputCalidad" class="form-select form-select-sm border-primary fw-bold" required>
+                            <option value="" disabled selected>¿Requiere Certificado?</option>
+                            <option value="SI">✅ SÍ REQUIERE</option>
+                            <option value="NO">❌ NO REQUIERE</option>
                         </select>
-
                     </div>
-
-                    
-
-                    <div class="col-12" id="divDireccionEntrega" style="display: none;">
-
-                        <label class="small fw-bold text-primary">Dirección de Envío</label>
-
-                        <div class="input-group input-group-sm">
-
-                            <span class="input-group-text bg-white"><i class="bi bi-geo-alt-fill text-danger"></i></span>
-
-                            <input type="text" id="inputDireccionEntrega" class="form-control form-control-sm border-primary" placeholder="Confirme o edite la dirección...">
-
-                        </div>
-
-                        <small class="text-muted fst-italic" style="font-size: 0.7rem;">* Se cargó la dirección fiscal, puede editarla.</small>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-
-        <div class="card shadow-sm mb-3 border-0">
-
-            <div class="card-header bg-light py-2">
-
-                <h6 class="mb-0 small fw-bold text-dark"><i class="bi bi-sliders"></i> 4. Condiciones Comerciales</h6>
-
-            </div>
-
-            <div class="card-body">
-
-                <div class="row g-3">
-
-                    <div class="col-md-6">
-
-                        <label class="small fw-bold text-muted">Condición de Pago</label>
-
-                        <select id="inputCondicionPago" class="form-select form-select-sm">
-
-                            <option value="Contado">Contado</option>
-
-                            <option value="Contra-entrega">Contra-entrega</option>
-
-                            <option value="Crédito 7 días">Crédito 7 días</option>
-
-                            <option value="Crédito 15 días">Crédito 15 días</option>
-
-                            <option value="Crédito 30 días">Crédito 30 días</option>
-
-                            <option value="Crédito 45 días">Crédito 45 días</option>
-
-                            <option value="Crédito 60 días">Crédito 60 días</option>
-
-                            <option value="Factura Negociable">Factura Negociable</option>
-
+                    <div class="col-6">
+                        <label class="small fw-bold text-danger">Penalidad Retraso *</label>
+                        <select id="inputPenalidad" class="form-select form-select-sm border-danger fw-bold" required>
+                            <option value="" disabled selected>¿Aplica Penalidad?</option>
+                            <option value="SI">⚠️ SÍ APLICA</option>
+                            <option value="NO">❌ NO APLICA</option>
                         </select>
-
                     </div>
 
-        
-
-                    <div class="col-md-6">
-
-                        <label class="small fw-bold text-muted">Validez Oferta</label>
-
-                        <select id="inputValidez" class="form-select form-select-sm">
-
-                            <option value="5 días">5 días</option>
-
-                            <option value="7 días">7 días</option>
-
-                            <option value="10 días">10 días</option>
-
-                            <option value="15 días">15 días</option>
-
-                            <option value="30 días">30 días</option>
-
-                        </select>
-
-                    </div>
-
-                    
-
-                    <div class="col-md-12">
-
+                    <div class="col-12 mt-2">
                         <label class="small fw-bold text-muted">Observaciones Adicionales</label>
-
                         <textarea id="inputObservacion" class="form-control form-control-sm" rows="2" placeholder="Ej: Mercadería puesta en almacén..."></textarea>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
-
+        
     </div>
 
+    <div class="col-lg-8 col-md-12 d-flex flex-column gap-3">
 
+        <div class="card shadow-sm border-0 m-0">
+            <div class="card-header bg-secondary text-white py-2 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 small fw-bold"><i class="bi bi-box-seam"></i> 2. Agregar Item</h6>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="modeOption" id="modeProd" autocomplete="off" checked onclick="cambiarModo('PRODUCTO')">
+                    <label class="btn btn-outline-light" for="modeProd">Producto</label>
+            
+                    <input type="radio" class="btn-check" name="modeOption" id="modeFab" autocomplete="off" onclick="cambiarModo('FABRICACION')">
+                    <label class="btn btn-outline-light" for="modeFab">Fabricación</label>
+            
+                    <input type="radio" class="btn-check" name="modeOption" id="modeGlb" autocomplete="off" onclick="cambiarModo('GLB')">
+                    <label class="btn btn-outline-light" for="modeGlb">Armado (GLB)</label>
+                </div>
+            </div>
 
-    <div class="col-lg-7 col-md-12">
+            <div class="card-body">
+                <div id="panelProducto">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4 col-12">
+                            <label class="small text-muted mb-1 fw-bold">1. Familia</label>
+                            <select class="form-select form-select-sm" id="filtroFamiliaVenta" onchange="window.cargarCalidadesVenta()">
+                                <option value="" selected>-- Seleccione --</option>
+                                {% for c in categorias %} <option value="{{ c.id }}" data-nombre="{{ c.nombre }}">{{ c.nombre }}</option> {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <label class="small text-muted mb-1 fw-bold">2. Calidad</label>
+                            <select class="form-select form-select-sm" id="filtroCalidadVenta" disabled onchange="window.cargarProductos()">
+                                <option value="">-- Espere familia --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <label class="small text-muted mb-1 fw-bold">3. Buscar Producto</label>
+                            <select class="form-select" id="productoSelect" style="width: 100%;">
+                                <option value="" disabled selected>Escriba para buscar...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
-        <div class="card shadow-sm h-100 border-0">
+                <div id="panelFabricacion" class="d-none">
+                    <div class="row g-2 mb-2 align-items-end">
+                        <div class="col-md-5">
+                            <label class="small fw-bold text-muted">1. Tipo de Servicio</label>
+                            <div class="input-group input-group-sm">
+                                <select id="selTipoServicio" class="form-select fw-bold text-primary">
+                                    <option value="SRV-GEN" data-titulo="SERVICIO GENERAL">-- CARGANDO --</option>
+                                </select>
+                                <button class="btn btn-outline-success" type="button" onclick="abrirModalNuevoServicio()" title="Crear Nuevo Tipo">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="small fw-bold text-muted">2. Descripción (EETT)</label>
+                            <textarea id="fabDesc" class="form-control form-control-sm text-uppercase" rows="1" placeholder="Ej: ARANDELA PLANA..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            
+                <div id="panelGLB" class="d-none">
+                    <div class="d-flex gap-3 align-items-center mb-2">
+                        <button class="btn btn-outline-dark btn-sm w-50" onclick="abrirModalGLB()">
+                            <i class="bi bi-layers-half"></i> Configurar Kit / Armado
+                        </button>
+                        <div id="glbPreview" class="small text-muted fst-italic w-50 border rounded p-1 bg-light m-0">Ningún kit configurado aún.</div>
+                    </div>
+                </div>
 
+                <div class="row g-2 align-items-end mt-2 pt-2 border-top">
+                    <div class="col-md-2 col-4">
+                        <label class="small text-muted">Stock</label>
+                        <input type="text" id="info_stock" class="form-control form-control-sm bg-light fw-bold text-center" readonly>
+                    </div>
+                    <div class="col-md-2 col-4">
+                        <label class="small text-muted fw-bold">Cant.</label>
+                        <input type="number" id="cantidadInput" class="form-control form-control-sm border-primary fw-bold text-center" 
+                               value="1" min="1" 
+                               onkeydown="return filtroTeclas(event, 'entero')"
+                               oninput="validarEntradaString(this, 0)">
+                    </div>
+                    <div class="col-md-3 col-4">
+                        <label class="small text-muted fw-bold text-primary">P. Unit (<span id="lblMonedaUnit">USD</span>)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text" id="simboloMonedaInput">$</span>
+                            <input type="number" id="precioManualInput" class="form-control fw-bold text-end" 
+                                   step="any" onkeydown="return filtroTeclas(event, 'decimal')" oninput="validarEntradaString(this, 6)">
+                            <input type="hidden" id="precioBaseHidden"> 
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6 d-flex flex-column text-center">
+                        <small class="text-muted" style="font-size: 0.7rem;">Subtotal Límite</small>
+                        <strong class="text-dark fs-6" id="txt_subtotal_previo">$ 0.00</strong>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <button class="btn btn-success w-100 btn-sm fw-bold h-100" id="btnAgregar" disabled>
+                            <i class="bi bi-plus-lg"></i> AGREGAR A LA LISTA
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 m-0 flex-grow-1">
             <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-
                 <div class="d-flex align-items-center gap-2">
                     <h5 class="mb-0 text-primary fw-light">Detalle de Cotización</h5>
                     <button class="btn btn-sm btn-warning shadow-sm fw-bold ms-2" onclick="aplicarDescuentoMasivo()" title="Aplicar descuento a todos los ítems">
                         <i class="bi bi-percent"></i> Masivo
                     </button>
                 </div>
-
                 <span id="badgeTC_Visual" class="badge bg-warning text-dark border border-dark d-none">
-
                     T.C. <span id="lblTC_Visual">0.000</span>
-
                 </span>
-
             </div>
-
                         
-
-            <div class="card-body p-0 d-flex flex-column">
-
-                <div class="table-responsive flex-grow-1" style="max-height: 500px; overflow-y: auto;">
-
+            <div class="card-body p-0 d-flex flex-column h-100">
+                <div class="table-responsive flex-grow-1" style="min-height: 250px; overflow-y: auto;">
                     <table class="table table-sm table-hover mb-0 align-middle">
-
                         <thead class="table-light sticky-top small text-muted text-uppercase">
-
                             <tr>
-
                                 <th style="width: 40%;" class="ps-3">Descripción</th>
-
-                                <th class="text-center" style="width: 10%;">U.M.</th> <th class="text-center" style="width: 15%;">Cant.</th>
-
+                                <th class="text-center" style="width: 10%;">U.M.</th> 
+                                <th class="text-center" style="width: 15%;">Cant.</th>
                                 <th class="text-end" style="width: 15%;">P. Unit</th>
-
                                 <th class="text-end" style="width: 15%;">Total</th>
-
                                 <th style="width: 5%;"></th>
-
                             </tr>
-
                         </thead>
-
                         <tbody id="tablaCarrito"></tbody>
-
                     </table>
-
                     <div id="msgVacio" class="text-center text-muted py-5 my-5">
-
                         <i class="bi bi-cart-x display-1 opacity-25"></i>
-
                         <p class="mt-3 small">No hay productos en la lista.</p>
-
                     </div>
-
                 </div>
-
             </div>
-
-
 
             <div class="card-footer bg-white border-top p-3">
-
                 <div class="row justify-content-end">
-
-                    <div class="col-md-9 col-12"> <table class="table table-sm table-borderless mb-0 align-middle">
-
+                    <div class="col-md-7 col-12"> 
+                        <table class="table table-sm table-borderless mb-0 align-middle">
                             <tr>
-
                                 <td class="text-end text-muted">Subtotal Inicial:</td>
-
-                                <td class="text-end fw-bold" id="lblSubtotalInicial">0.00</td>
-
+                                <td class="text-end fw-bold" id="lblSubtotalInicial" style="width: 120px;">0.00</td>
                             </tr>
-
-
-
                             <tr class="border-bottom">
-
                                 <td class="text-end">
-
                                     <div class="d-flex justify-content-end align-items-center gap-2">
-
                                         <label class="small text-danger fw-bold me-1">Descuento:</label>
-
                                         <select id="tipoDescuento" class="form-select form-select-sm border-danger text-danger fw-bold" style="width: 70px;" onchange="actualizarTotalesGlobales()">
-
                                             <option value="MONTO">$</option> <option value="PORCENTAJE">%</option>
-
                                         </select>
-
                                         <input type="number" id="inputDescuento" class="form-control form-control-sm border-danger text-end text-danger fw-bold" 
-
                                             value="0" min="0" step="0.01" style="width: 80px;" 
-
                                             onkeydown="return evitarNegativos(event)"
-
                                             oninput="validarInputDescuento(this); actualizarTotalesGlobales()">
-
                                     </div>
-
                                 </td>
-
                                 <td class="text-end fw-bold text-danger" id="lblMontoDescuento">- 0.00</td>
-
                             </tr>
-
-
-
                             <tr>
-
                                 <td class="text-end text-muted small">Valor de Venta (Neto):</td>
-
                                 <td class="text-end fw-bold" id="lblSubtotalNeto">0.00</td>
-
                             </tr>
-
-
-
                             <tr>
-
                                 <td class="text-end text-muted">IGV (18%):</td>
-
                                 <td class="text-end fw-bold" id="lblIGV">0.00</td>
-
                             </tr>
-
-
-
                             <tr class="border-top bg-light">
-
-                                <td class="text-end fs-4 fw-bold text-dark pt-2">TOTAL:</td>
-
-                                <td class="text-end fs-4 fw-bold text-primary pt-2" id="lblTotal">0.00</td>
-
+                                <td class="text-end fs-5 fw-bold text-dark pt-2">TOTAL:</td>
+                                <td class="text-end fs-5 fw-bold text-primary pt-2" id="lblTotal">0.00</td>
                             </tr>
-
                         </table>
-
                     </div>
-
                 </div>
-
+                
                 <div class="d-grid gap-2 mt-3">
-
                     <button class="btn btn-warning btn-lg fw-bold shadow-sm" onclick="window.previsualizarVenta()">
-
                         <i class="bi bi-save2"></i> GUARDAR COTIZACIÓN
-
                     </button>
-
                 </div>
-
             </div>
-
         </div>
 
     </div>
-
 </div>
-
-
-
 
 
 <div class="modal fade" id="modalNuevoServicio" tabindex="-1">
@@ -889,16 +565,15 @@
 
                     <div class="card-body py-2">
 
-                        <h6 class="text-primary fw-bold border-bottom pb-1 mb-2">Datos del Cliente</h6>
-
+                        <h6 class="text-primary fw-bold border-bottom pb-1 mb-2">Datos del Cliente y Condiciones</h6>
                         <div class="row small">
-
                             <div class="col-md-8"><strong>Razón Social:</strong> <span id="res_cliente"></span></div>
-
-                            <div class="col-md-4"><strong>RUC/DNI:</strong> <span id="res_ruc"></span></div>
-
+                            <div class="col-md-4"><strong>RUC:</strong> <span id="res_ruc"></span></div>
                             <div class="col-12 mt-1"><strong>Lugar Entrega:</strong> <span id="res_direccion" class="text-muted"></span></div>
-
+                            <!-- NUEVOS CAMPOS A MOSTRAR -->
+                            <div class="col-md-4 mt-2"><strong>Calidad:</strong> <span id="res_calidad"></span></div>
+                            <div class="col-md-4 mt-2"><strong>Penalidad:</strong> <span id="res_penalidad"></span></div>
+                            <div class="col-md-4 mt-2"><strong>Agencia:</strong> <span id="res_agencia" class="text-primary fw-bold"></span></div>
                         </div>
 
                     </div>
@@ -1298,6 +973,17 @@
         renderizarTabla(); 
     };
 
+    window.toggleAgencia = function() {
+        const req = document.getElementById('selectReqAgencia').value;
+        const div = document.getElementById('divNombreAgencia');
+        if(req === 'SI') {
+            div.style.display = 'block';
+        } else {
+            div.style.display = 'none';
+            document.getElementById('inputAgencia').value = '';
+        }
+    }
+
     window.aplicarDescuentoItem = function(index) {
         let item = carrito[index];
         let moneda = $('#selectMoneda').val();
@@ -1606,139 +1292,88 @@
 
 
         {% if modo_edicion %}
-
         console.log("Modo Edición Activado");
-
         
-
-        // 1. Recuperar datos inyectados por Flask
-
         const datosPreCargados = {{ items_json | tojson }}; 
-
         const datosCliente = {
-
             ruc: "{{ orden.cliente.documento }}",
-
             nombre: "{{ orden.cliente.nombre }}",
-
             dir: "{{ orden.direccion_envio or orden.cliente.direccion }}", 
-
             tel: "{{ orden.cliente.telefono or '' }}",
-
             atte: "{{ orden.atencion or '' }}",
-
             oc: "{{ orden.orden_compra or '' }}",
-
             tipo_entrega: "{{ orden.tipo_entrega }}",
-
             fecha: "{{ orden.fecha_entrega.strftime('%Y-%m-%d') if orden.fecha_entrega else '' }}",
-
             condicion: "{{ orden.condicion_pago }}",
-
             validez: "{{ orden.validez_oferta }}",
-
-            obs: `{{ orden.observacion or '' }}` 
-
+            obs: `{{ orden.observacion or '' }}`,
+            // RECUPERAMOS LOS CAMPOS NUEVOS
+            agencia: "{{ orden.agencia or 'NO REQUIERE' }}",
+            control_calidad: "{{ orden.control_calidad or 'NO' }}",
+            penalidad: "{{ orden.penalidad or 'NO' }}"
         };
-
         const datosFinancieros = {
-
             moneda: "{{ orden.moneda }}",
-
             desc_tipo: "{{ orden.descuento_tipo }}",
-
             desc_valor: {{ orden.descuento_valor }}
-
         };
 
-
-
-        // 2. LLENAR DATOS DEL CLIENTE
-
+        // Llenar cliente
         var newOption = new Option(datosCliente.ruc + " - " + datosCliente.nombre, datosCliente.ruc, true, true);
-
         $('#cli_doc_select').append(newOption).trigger('change');
-
         
-
         $('#cli_nom').val(datosCliente.nombre);
-
         $('#cli_dir').val(datosCliente.dir); 
-
         $('#cli_tel').val(datosCliente.tel);
-
         $('#cli_atte').val(datosCliente.atte);
-
         $('#cli_oc').val(datosCliente.oc);
 
-
-
-        // 3. LLENAR DATOS LOGÍSTICOS
-
+        // Llenar logística
         $('#inputFechaEntrega').val(datosCliente.fecha);
-
         $('#selectEntrega').val(datosCliente.tipo_entrega);
-
         if(datosCliente.tipo_entrega === 'Envio'){
-
             $('#divDireccionEntrega').show(); 
-
             $('#inputDireccionEntrega').val(datosCliente.dir);
-
         }
 
-        
+        // --- CARGAR AGENCIA ---
+        if (datosCliente.agencia && datosCliente.agencia !== 'NO REQUIERE' && datosCliente.agencia !== 'None') {
+            $('#selectReqAgencia').val('SI');
+            $('#divNombreAgencia').show();
+            $('#inputAgencia').val(datosCliente.agencia);
+        } else {
+            $('#selectReqAgencia').val('NO');
+            $('#divNombreAgencia').hide();
+            $('#inputAgencia').val('');
+        }
 
-        // 4. LLENAR DATOS COMERCIALES
-
+        // Llenar comercial
         $('#inputCondicionPago').val(datosCliente.condicion);
-
         $('#inputValidez').val(datosCliente.validez);
-
         $('#inputObservacion').val(datosCliente.obs);
-
-
-
-        // 5. CARGAR MONEDA Y DESCUENTO
-
-        $('#selectMoneda').val(datosFinancieros.moneda);
-
-        $('#tipoDescuento').val(datosFinancieros.desc_tipo);
-
-        $('#inputDescuento').val(datosFinancieros.desc_valor);
-
         
+        // --- CARGAR CALIDAD Y PENALIDAD ---
+        $('#inputCalidad').val(datosCliente.control_calidad);
+        $('#inputPenalidad').val(datosCliente.penalidad);
 
+        // Moneda y carrito
+        $('#selectMoneda').val(datosFinancieros.moneda);
+        $('#tipoDescuento').val(datosFinancieros.desc_tipo);
+        $('#inputDescuento').val(datosFinancieros.desc_valor);
+        
         let simbolo = (datosFinancieros.moneda === 'PEN') ? 'S/' : '$';
-
         $('#simboloMonedaInput').text(simbolo); 
-
         $('#lblMonedaUnit').text(datosFinancieros.moneda); 
 
-
-
-        // 6. CARGAR EL CARRITO (GLOBAL)
-
         carrito = datosPreCargados;
-
         renderizarTabla(); 
-
         
-
-        // 7. CAMBIAR EL BOTÓN A "GUARDAR CAMBIOS"
-
+        // Cambiar botón a "Guardar Cambios"
         const btnGuardar = document.querySelector('button[onclick="window.previsualizarVenta()"]');
-
         if(btnGuardar) {
-
             btnGuardar.innerHTML = '<i class="bi bi-save"></i> GUARDAR CAMBIOS';
-
             btnGuardar.className = 'btn btn-primary btn-lg fw-bold shadow-sm';
-
         }
-
-        
-
         {% endif %}
 
 
@@ -4155,215 +3790,120 @@ function recalcularCarritoPorMoneda() {
 
 
     function confirmarYGuardar() {
-
         // 1. Cerrar modal resumen
-
         bootstrap.Modal.getInstance(document.getElementById('modalResumenVenta')).hide();
 
-
-
         // 2. Mostrar cargando
-
         Swal.fire({
-
             title: 'Procesando...', text: 'Guardando información...', 
-
             allowOutsideClick: false, 
-
             didOpen: () => { Swal.showLoading() } 
-
         });
-
-
 
         // 3. Cálculos Finales
-
         let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
-
         let tipoDesc = $('#tipoDescuento').val(); 
-
         let valorDesc = parseFloat($('#inputDescuento').val()) || 0;
-
         let montoDescontado = 0;
-
         
-
         if (tipoDesc === 'PORCENTAJE') montoDescontado = totalItems * (valorDesc / 100);
-
         else montoDescontado = valorDesc;
-
         
-
         if(montoDescontado > totalItems) montoDescontado = totalItems;
 
-
-
         let subtotalNeto = totalItems - montoDescontado;
-
         let igv = subtotalNeto * 0.18;
-
         let totalFinal = subtotalNeto + igv;
 
-
-
-        // --- 4. DETECTAR SI ES EDICIÓN (LA CLAVE DEL ARREGLO) ---
-
+        // 4. Detectar si es Edición o Nuevo
         const orderIdEditing = document.getElementById('hidden_order_id').value;
-
-        
-
-        // Determinar URL de destino: Si hay ID es UPDATE, si no es CREATE
-
         let urlDestino = '/nueva_venta';
-
         if (orderIdEditing && orderIdEditing !== '') {
-
             urlDestino = '/actualizar_venta';
-
         }
 
+        // 5. CAPTURAR AGENCIA INTELIGENTE
+        let reqAgencia = $('#selectReqAgencia').val();
+        let agenciaFinal = 'NO REQUIERE';
+        if (reqAgencia === 'SI') {
+            agenciaFinal = $('#inputAgencia').val().trim();
+            if (!agenciaFinal) agenciaFinal = 'NO REQUIERE'; // Seguridad extra
+        }
 
-
-        // --- 5. CONSTRUIR PAYLOAD ---
-
+        // 6. CONSTRUIR PAYLOAD CON LOS 3 CAMPOS NUEVOS
         const payload = {
-
-            order_id: orderIdEditing, // ENVIAMOS EL ID (Vacío si es nuevo, lleno si es edición)
-
+            order_id: orderIdEditing, 
             
-
             cliente_ruc: $('#cli_doc_select').val(), 
-
             cliente_nombre: $('#cli_nom').val(), 
-
             cliente_tel: $('#cli_tel').val(), 
-
             cliente_dir: $('#cli_dir').val(),
-
             cliente_atte: $('#cli_atte').val(), 
-
             orden_compra: $('#cli_oc').val(),
-
             
-
             condicion_pago: $('#inputCondicionPago').val(), 
-
             validez_oferta: $('#inputValidez').val(),
-
             plazo_entrega_texto: "", 
-
             observacion: $('#inputObservacion').val(),
-
             
-
             fecha_entrega: $('#inputFechaEntrega').val(), 
-
             tipo_entrega: $('#selectEntrega').val(), 
-
             direccion_entrega: $('#inputDireccionEntrega').val(),
-
             
-
             moneda: $('#selectMoneda').val(), 
-
             tc: $('#inputTC').val(), 
-
             items: carrito, 
-
             
-
             subtotal: subtotalNeto, 
-
             igv: igv, 
-
             total: totalFinal,
-
-            
-
             descuento_tipo: tipoDesc,
-
             descuento_valor: valorDesc,
+            descuento_total: montoDescontado,
 
-            descuento_total: montoDescontado
-
+            // ---- ¡AQUÍ ESTÁN LOS 3 CAMPOS CONECTADOS AL BACKEND! ----
+            agencia: agenciaFinal,
+            control_calidad: $('#inputCalidad').val() || 'NO',
+            penalidad: $('#inputPenalidad').val() || 'NO'
+            // ---------------------------------------------------------
         };
-
         
-
-        // --- 6. ENVIAR AL SERVIDOR ---
-
+        // 7. ENVIAR AL SERVIDOR
         fetch(urlDestino, { 
-
             method: 'POST', 
-
             headers: {'Content-Type': 'application/json'}, 
-
             body: JSON.stringify(payload) 
-
         })
-
         .then(r => r.json()).then(data => {
-
             if(data.status === 'success') {
-
-                // Mensaje diferente si editamos o creamos
-
                 let tituloMsg = orderIdEditing ? '¡Actualizado!' : '¡Cotización Creada!';
-
                 let textoMsg = orderIdEditing ? 'La cotización ha sido corregida correctamente.' : `Se generó la cotización #${data.order_id}`;
 
-
-
                 Swal.fire({ 
-
                     title: tituloMsg, 
-
                     html: `
-
                         <p class="mb-3">${textoMsg}</p>
-
                         <div class="d-grid gap-2">
-
                             <a href="/descargar_cotizacion/${data.order_id}" class="btn btn-primary fw-bold">
-
                                 <i class="bi bi-file-earmark-pdf-fill"></i> DESCARGAR PDF
-
                             </a>
-
                             <a href="{{ url_for('historial_ventas') }}" class="btn btn-outline-secondary">
-
                                 <i class="bi bi-arrow-left"></i> Volver al Historial
-
                             </a>
-
                         </div>
-
                     `,
-
                     icon: 'success',
-
                     showConfirmButton: false,
-
                     allowOutsideClick: false
-
                 });
-
             } else { 
-
                 Swal.fire('Error', data.msg, 'error'); 
-
             }
-
         })
-
         .catch(err => {
-
             console.error(err);
-
             Swal.fire('Error Crítico', 'No se pudo conectar con el servidor', 'error');
-
         });
-
     }
 
 
@@ -4648,9 +4188,20 @@ function recalcularCarritoPorMoneda() {
 
         const nombre = $('#cli_nom').val();
 
-        if(!ruc || !nombre) return Swal.fire('Falta Cliente', 'Por favor seleccione un cliente válido.', 'warning');
+        // --- NUEVAS VALIDACIONES OBLIGATORIAS ---
+        const calidad = $('#inputCalidad').val();
+        const penalidad = $('#inputPenalidad').val();
 
+        let agencia = "NO REQUIERE";
+
+        if ($('#selectReqAgencia').val() === 'SI') {
+            agencia = $('#inputAgencia').val().trim();
+            if(!agencia) return Swal.fire('Falta Agencia', 'Ha marcado que SÍ requiere agencia. Por favor escriba el nombre.', 'warning');
+        }
+
+        if(!ruc || !nombre) return Swal.fire('Falta Cliente', 'Por favor seleccione un cliente válido.', 'warning');
         if(carrito.length === 0) return Swal.fire('Carrito Vacío', 'Agregue al menos un producto o servicio.', 'warning');
+        if(!calidad || !penalidad) return Swal.fire('Datos Incompletos', 'Debe indicar si requiere Calidad y si aplica Penalidad.', 'warning');
 
 
 
@@ -4798,6 +4349,11 @@ function mostrarModalResumen() {
 
         $('#res_direccion').text(dir || '-');
 
+        let agenciaFinal = $('#selectReqAgencia').val() === 'SI' ? $('#inputAgencia').val() : 'NO REQUIERE';
+        $('#res_calidad').html($('#inputCalidad').val() === 'SI' ? '<span class="text-success">✅ SÍ</span>' : '❌ NO');
+        $('#res_penalidad').html($('#inputPenalidad').val() === 'SI' ? '<span class="text-danger">⚠️ SÍ</span>' : '❌ NO');
+        $('#res_agencia').text(agenciaFinal);
+
 
 
         const tbody = $('#tablaResumenBody'); tbody.empty();
@@ -4826,220 +4382,116 @@ function mostrarModalResumen() {
 
     // --- FUNCIÓN AUXILIAR PARA MOSTRAR EL MODAL FINAL ---
 
+// --- FUNCIÓN PARA GUARDAR O ACTUALIZAR ---
+// --- FUNCIÓN PARA GUARDAR O ACTUALIZAR ---
     function enviarDatosBackend() {
-
-        // --- 1. CÁLCULOS FINALES EN JS (Para enviar estructura, el Backend recalcula por seguridad) ---
-
+        // 1. Cálculos Finales
         let totalItems = carrito.reduce((s, i) => s + i.subtotal, 0);
-
-        
-
         let tipoDesc = $('#tipoDescuento').val(); 
-
         let valorDesc = parseFloat($('#inputDescuento').val()) || 0;
-
         let montoDescontado = 0;
-
         
-
         if (tipoDesc === 'PORCENTAJE') montoDescontado = totalItems * (valorDesc / 100);
-
         else montoDescontado = valorDesc;
-
         
-
         if(montoDescontado > totalItems) montoDescontado = totalItems;
 
-
-
         let subtotalNeto = totalItems - montoDescontado;
-
         let igv = subtotalNeto * 0.18;
-
         let totalFinal = subtotalNeto + igv;
 
-
-
-        // --- 2. DETECTAR SI ES EDICIÓN ---
-
+        // 2. Detectar si es Edición o Nuevo
         const orderIdEditing = document.getElementById('hidden_order_id').value;
-
-        
-
-        // Determinar URL de destino
-
         let urlDestino = '/nueva_venta';
-
-        if (orderIdEditing) {
-
+        if (orderIdEditing && orderIdEditing !== '') {
             urlDestino = '/actualizar_venta';
-
         }
 
+        // 3. Capturar la Agencia correctamente
+        let reqAgencia = $('#selectReqAgencia').val();
+        let agenciaFinal = 'NO REQUIERE';
+        if (reqAgencia === 'SI') {
+            agenciaFinal = $('#inputAgencia').val().trim();
+            if (!agenciaFinal) agenciaFinal = 'NO REQUIERE'; // Seguridad extra
+        }
 
-
-        // --- 3. CONSTRUIR PAYLOAD ---
-
+        // 4. CONSTRUIR PAYLOAD (AQUÍ ESTÁ EL TRUCO PARA QUE PYTHON LO GUARDE)
         const payload = {
-
-            order_id: orderIdEditing, // Se envía (vacío si es nuevo, con ID si es edit)
-
+            order_id: orderIdEditing, 
             
-
-            // Datos del Cliente
-
             cliente_ruc: $('#cli_doc_select').val(), 
-
             cliente_nombre: $('#cli_nom').val(), 
-
             cliente_tel: $('#cli_tel').val(), 
-
             cliente_dir: $('#cli_dir').val(),
-
             cliente_atte: $('#cli_atte').val(), 
-
             orden_compra: $('#cli_oc').val(),
-
             
-
-            // Condiciones Comerciales
-
             condicion_pago: $('#inputCondicionPago').val(), 
-
             validez_oferta: $('#inputValidez').val(),
-
             plazo_entrega_texto: "", 
-
             observacion: $('#inputObservacion').val(),
-
             
-
-            // Logística
-
             fecha_entrega: $('#inputFechaEntrega').val(), 
-
             tipo_entrega: $('#selectEntrega').val(), 
-
             direccion_entrega: $('#inputDireccionEntrega').val(),
-
             
-
-            // Moneda y Items
-
             moneda: $('#selectMoneda').val(), 
-
             tc: $('#inputTC').val(), 
-
             items: carrito, 
-
             
-
-            // Totales (Referenciales para el backend)
-
             subtotal: subtotalNeto, 
-
             igv: igv, 
-
             total: totalFinal,
-
-            
-
             descuento_tipo: tipoDesc,
-
             descuento_valor: valorDesc,
+            descuento_total: montoDescontado,
 
-            descuento_total: montoDescontado
-
+            // ---- ¡ESTOS 3 CAMPOS FALTABAN ENVIARSE A PYTHON! ----
+            agencia: agenciaFinal,
+            control_calidad: $('#inputCalidad').val() || 'NO',
+            penalidad: $('#inputPenalidad').val() || 'NO'
+            // ------------------------------------------------------
         };
-
         
-
-        // --- 4. ENVIAR AL SERVIDOR ---
-
-        // Mostrar cargando
-
-        Swal.fire({
-
-            title: 'Procesando...', 
-
-            text: 'Guardando información...',
-
-            allowOutsideClick: false,
-
-            didOpen: () => { Swal.showLoading() }
-
-        });
-
-
+        // 5. Enviar al Servidor
+        Swal.fire({ title: 'Guardando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
 
         fetch(urlDestino, { 
-
             method: 'POST', 
-
             headers: {'Content-Type': 'application/json'}, 
-
             body: JSON.stringify(payload) 
-
         })
-
         .then(r => r.json()).then(data => {
-
             if(data.status === 'success') {
-
-                let msg = orderIdEditing ? 'Cambios guardados correctamente.' : 'Cotización creada exitosamente.';
-
-                
+                let tituloMsg = orderIdEditing ? '¡Actualizado!' : '¡Cotización Creada!';
+                let textoMsg = orderIdEditing ? 'La cotización ha sido corregida correctamente.' : `Se generó la cotización #${data.order_id}`;
 
                 Swal.fire({ 
-
-                    title: '¡Éxito!', 
-
-                    text: msg, 
-
+                    title: tituloMsg, 
+                    html: `
+                        <p class="mb-3">${textoMsg}</p>
+                        <div class="d-grid gap-2">
+                            <a href="/descargar_cotizacion/${data.order_id}" class="btn btn-primary fw-bold">
+                                <i class="bi bi-file-earmark-pdf-fill"></i> DESCARGAR PDF
+                            </a>
+                            <a href="{{ url_for('historial_ventas') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Volver al Historial
+                            </a>
+                        </div>
+                    `,
                     icon: 'success',
-
-                    showCancelButton: true,
-
-                    confirmButtonText: 'Ver PDF',
-
-                    cancelButtonText: 'Ir al Historial'
-
-                }).then((result) => {
-
-                    if (result.isConfirmed) {
-
-                        // Descargar PDF
-
-                        window.location.href = `/descargar_cotizacion/${data.order_id}`;
-
-                    } else {
-
-                        // Redirigir al historial
-
-                        window.location.href = "{{ url_for('historial_ventas') }}";
-
-                    }
-
+                    showConfirmButton: false,
+                    allowOutsideClick: false
                 });
-
             } else { 
-
                 Swal.fire('Error', data.msg, 'error'); 
-
             }
-
         })
-
         .catch(err => {
-
             console.error(err);
-
             Swal.fire('Error Crítico', 'No se pudo conectar con el servidor', 'error');
-
         });
-
     }
-
 
 
     function cargarCalidadesVenta() {

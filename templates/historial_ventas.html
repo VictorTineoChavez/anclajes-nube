@@ -15,7 +15,7 @@
     <li class="nav-item">
         <a class="nav-link {% if vista_actual == 'borradores' and not request.args.get('busqueda') %}active{% endif %}" 
            href="{{ url_for('historial_ventas', vista='borradores') }}">
-            <i class="bi bi-pencil-square"></i> En Proceso
+            <i class="bi bi-pencil-square"></i> 1. En Proceso (Borradores)
             {% if cuentas.obs > 0 and session.get('role') == 'vendedor' %}
                 <span class="badge bg-danger ms-2 blink-anim">! {{ cuentas.obs }} DEVUELTOS</span>
             {% endif %}
@@ -24,7 +24,7 @@
     <li class="nav-item">
         <a class="nav-link {% if vista_actual == 'revision' %}active{% endif %}" 
            href="{{ url_for('historial_ventas', vista='revision') }}">
-            <i class="bi bi-hourglass-split"></i> Por Aprobar
+            <i class="bi bi-hourglass-split"></i> 2. En Validación
             {% if cuentas.rev > 0 %}
                 <span class="badge bg-warning text-dark ms-1">{{ cuentas.rev }}</span>
             {% endif %}
@@ -33,7 +33,7 @@
     <li class="nav-item ms-auto">
         <a class="nav-link text-secondary {% if vista_actual == 'historial' %}active bg-secondary text-white{% endif %}" 
            href="{{ url_for('historial_ventas', vista='historial') }}">
-            <i class="bi bi-archive"></i> Historial (Aprobadas / Anuladas)
+            <i class="bi bi-archive"></i> 3. Historial Final
         </a>
     </li>
 </ul>
@@ -44,64 +44,50 @@
             <input type="hidden" name="vista" value="{{ vista_actual }}">
 
             <div class="col-md-3">
-                <label class="small fw-bold text-muted">Buscador Texto</label>
+                <label class="small fw-bold text-muted">Buscador</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                    <input type="text" name="busqueda" class="form-control" 
-                        placeholder="N° Pedido, Nombre..." 
-                        value="{{ request.args.get('busqueda', '') }}">
+                    <input type="text" name="busqueda" class="form-control" placeholder="N° Pedido, Nombre..." value="{{ request.args.get('busqueda', '') }}">
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <label class="small fw-bold text-muted">Filtrar Cliente</label>
+            <div class="col-md-2">
+                <label class="small fw-bold text-muted">Cliente</label>
                 <select name="filtro_cliente" id="selectFiltroCliente" class="form-select form-select-sm" style="width: 100%">
-                    <option value="">Todos los clientes</option>
+                    <option value="">Todos</option>
                     {% for c in clientes %}
-                        <option value="{{ c.documento }}" {% if cliente_seleccionado == c.documento %}selected{% endif %}>
-                            {{ c.nombre }} ({{ c.documento }})
-                        </option>
+                        <option value="{{ c.documento }}" {% if cliente_seleccionado == c.documento %}selected{% endif %}>{{ c.nombre }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             {% if session.get('role') in ['admin', 'administracion'] %}
-            <div class="col-md-2">
-                <label class="small fw-bold text-muted">Vendedor</label>
-                <select name="filtro_vendedor" class="form-select form-select-sm">
-                    <option value="todos">Todos</option>
-                    {% for v in vendedores %}
-                        <option value="{{ v.id }}" {% if request.args.get('filtro_vendedor') == v.id|string %}selected{% endif %}>
-                            {{ v.username }}
-                        </option>
-                    {% endfor %}
-                </select>
+            <div class="col-md-2 d-flex align-items-end">
+                <div class="form-check form-switch border rounded bg-white d-flex align-items-center justify-content-center m-0 shadow-sm w-100" style="height: 31px;">
+                    <input class="form-check-input mt-0 me-2" type="checkbox" name="solo_mias" id="checkSoloMias" 
+                           onchange="this.form.submit()" {% if request.args.get('solo_mias') == 'on' %}checked{% endif %} style="cursor: pointer;">
+                    <label class="form-check-label fw-bold text-primary small mb-0" for="checkSoloMias" style="cursor: pointer;">Mis Cotizaciones</label>
+                </div>
             </div>
             {% endif %}
 
-            <div class="col-md-2"> 
+            <div class="col-md-3"> 
                 <div class="d-flex gap-1">
                     <div class="w-50">
                         <label class="small fw-bold text-muted" style="font-size: 0.7rem;">Desde</label>
-                        <input type="date" name="fecha_inicio" class="form-control form-control-sm px-1" 
-                            value="{{ request.args.get('fecha_inicio', '') }}">
+                        <input type="date" name="fecha_inicio" class="form-control form-control-sm px-1" value="{{ request.args.get('fecha_inicio', '') }}">
                     </div>
                     <div class="w-50">
                         <label class="small fw-bold text-muted" style="font-size: 0.7rem;">Hasta</label>
-                        <input type="date" name="fecha_fin" class="form-control form-control-sm px-1" 
-                            value="{{ request.args.get('fecha_fin', '') }}">
+                        <input type="date" name="fecha_fin" class="form-control form-control-sm px-1" value="{{ request.args.get('fecha_fin', '') }}">
                     </div>
                 </div>
             </div>
             
             <div class="col-md-2 text-end">
                 <div class="d-flex gap-1">
-                    <button type="submit" class="btn btn-primary btn-sm fw-bold w-100" title="Aplicar Filtros">
-                        <i class="bi bi-funnel-fill"></i>
-                    </button>
-                    <a href="{{ url_for('historial_ventas', vista=vista_actual) }}" class="btn btn-outline-secondary btn-sm w-50" title="Limpiar Filtros">
-                        <i class="bi bi-arrow-counterclockwise"></i>
-                    </a>
+                    <button type="submit" class="btn btn-primary btn-sm fw-bold w-100" title="Aplicar Filtros"><i class="bi bi-funnel-fill"></i> Filtrar</button>
+                    <a href="{{ url_for('historial_ventas', vista=vista_actual) }}" class="btn btn-outline-secondary btn-sm" title="Limpiar"><i class="bi bi-arrow-counterclockwise"></i></a>
                 </div>
             </div>
         </form>
@@ -115,10 +101,11 @@
                 <tr>
                     <th class="ps-4">Código</th>
                     <th>F. Creación</th>
+                    <th>F. Entrega</th>
                     <th>Cliente</th>
                     <th>Vendedor</th>
                     <th class="text-end">Total</th>
-                    <th class="text-center">Estado</th>
+                    <th class="text-center">Estado Flujo</th>
                     <th class="text-center">Acción</th>
                 </tr>
             </thead>
@@ -128,7 +115,7 @@
                         
                         <td class="ps-4 fw-bold">
                             {% if o.estado == 'Observado' %}
-                                <i class="bi bi-exclamation-triangle-fill text-danger me-1 blink-anim" title="Devuelto por Gerencia"></i>
+                                <i class="bi bi-exclamation-triangle-fill text-danger me-1 blink-anim" title="Devuelto por Gerencia o Almacén"></i>
                             {% endif %}
                             {{ "%05d"|format(o.id) }}
                         </td>
@@ -139,6 +126,28 @@
                                 <span class="text-muted" style="font-size:0.75rem">{{ o.fecha.strftime('%H:%M') }}</span>
                             </div>
                         </td>
+
+                        <td>
+                            {% if o.fecha_entrega %}
+                                <div class="text-danger fw-bold">
+                                    <i class="bi bi-calendar-event-fill"></i> {{ o.fecha_entrega.strftime('%d/%m/%Y') }}
+                                </div>
+                            {% else %}
+                                <span class="text-muted fst-italic" style="font-size:0.75rem">A coordinar</span>
+                            {% endif %}
+                            
+                            <div class="mt-1 d-flex flex-column gap-1 align-items-start">
+                                {% if o.control_calidad == 'SI' %}
+                                    <span class="badge bg-primary" style="font-size:0.65rem"><i class="bi bi-patch-check"></i> CERTIFICADO</span>
+                                {% endif %}
+                                {% if o.agencia and o.agencia != 'NO REQUIERE' %}
+                                    <span class="badge bg-info text-dark" style="font-size:0.65rem" title="Agencia"><i class="bi bi-truck"></i> {{ o.agencia|truncate(15) }}</span>
+                                {% endif %}
+                                {% if o.penalidad == 'SI' %}
+                                    <span class="badge bg-danger" style="font-size:0.65rem"><i class="bi bi-exclamation-octagon"></i> PENALIDAD</span>
+                                {% endif %}
+                            </div>
+                        </td>
                         
                         <td>
                             <div class="fw-bold text-truncate" style="max-width: 200px;">{{ o.cliente.nombre }}</div>
@@ -147,7 +156,7 @@
                             {% endif %}
                         </td>
                         
-                        <td>{{ o.vendedor.username }}</td>
+                        <td class="text-muted"><i class="bi bi-person"></i> {{ o.vendedor.username }}</td>
                         
                         <td class="text-end fw-bold font-monospace">
                             {{ "S/" if o.moneda == 'PEN' else "$" }} {{ "%.2f"|format(o.total) }}
@@ -156,15 +165,19 @@
                         <td class="text-center">
                             <span class="badge 
                                 {% if o.estado == 'Cotizacion' %}bg-secondary
+                                {% elif o.estado == 'Por Verificar' %}bg-info text-dark border border-info
+                                {% elif o.estado == 'Stock Confirmado' %}bg-primary text-white border border-primary
                                 {% elif o.estado == 'Pendiente Aprobacion' %}bg-warning text-dark border border-dark
                                 {% elif o.estado == 'Observado' %}bg-danger
                                 {% elif o.estado == 'Aprobado' %}bg-success
                                 {% elif o.estado == 'Anulado' %}bg-dark
                                 {% else %}bg-secondary{% endif %}">
                                 
-                                {% if o.estado == 'Cotizacion' %}📝 Borrador
-                                {% elif o.estado == 'Pendiente Aprobacion' %}⏳ En Revisión
-                                {% elif o.estado == 'Observado' %}⚠️ CORREGIR
+                                {% if o.estado == 'Cotizacion' %}📝 Borrador (Vendedor)
+                                {% elif o.estado == 'Por Verificar' %}🔎 Verificando Stock (Almacén)
+                                {% elif o.estado == 'Stock Confirmado' %}📞 Esperando Cliente (Stock OK)
+                                {% elif o.estado == 'Pendiente Aprobacion' %}⏳ Revisión Gerencia
+                                {% elif o.estado == 'Observado' %}⚠️ CORREGIR (Devuelto)
                                 {% elif o.estado == 'Aprobado' %}✅ Aprobada / Lista
                                 {% elif o.estado == 'Anulado' %}❌ Anulada
                                 {% else %}{{ o.estado }}{% endif %}
@@ -184,7 +197,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="7" class="text-center py-5 text-muted">
+                        <td colspan="8" class="text-center py-5 text-muted">
                             <div class="fs-1 opacity-25"><i class="bi bi-folder2-open"></i></div>
                             <p class="mt-2">No se encontraron registros en esta vista.</p>
                         </td>
@@ -227,12 +240,46 @@
             </div>
 
             <div class="modal-body bg-light p-4">
+                <div class="card border-0 shadow-sm mb-4 bg-white">
+                    <div class="card-body p-3">
+                        <div class="position-relative m-4">
+                            <div class="progress position-absolute" style="height: 4px; top: 50%; left: 0; right: 0; transform: translateY(-50%); z-index: 1;">
+                                <div id="timeline_bar" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between position-relative" style="z-index: 2;">
+                                <div class="text-center" style="width: 80px;">
+                                    <div id="step1_icon" class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center mx-auto shadow-sm" style="width: 35px; height: 35px; border: 3px solid white;"><i class="bi bi-file-earmark-plus"></i></div>
+                                    <div class="small fw-bold mt-2 text-dark" style="font-size:0.7rem; line-height: 1;">Borrador</div>
+                                    <div id="step1_info" class="text-muted" style="font-size:0.6rem;">...</div>
+                                </div>
+                                <div class="text-center" style="width: 80px;">
+                                    <div id="step2_icon" class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border" style="width: 35px; height: 35px; border: 3px solid white;"><i class="bi bi-box-seam"></i></div>
+                                    <div class="small fw-bold mt-2 text-muted" id="step2_text" style="font-size:0.7rem; line-height: 1;">Stock OK</div>
+                                    <div id="step2_info" class="text-muted" style="font-size:0.6rem;">Pendiente</div>
+                                </div>
+                                <div class="text-center" style="width: 80px;">
+                                    <div id="step3_icon" class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border" style="width: 35px; height: 35px; border: 3px solid white;"><i class="bi bi-person-check"></i></div>
+                                    <div class="small fw-bold mt-2 text-muted" id="step3_text" style="font-size:0.7rem; line-height: 1;">OK Cliente</div>
+                                    <div id="step3_info" class="text-muted" style="font-size:0.6rem;">Pendiente</div>
+                                </div>
+                                <div class="text-center" style="width: 80px;">
+                                    <div id="step4_icon" class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border" style="width: 35px; height: 35px; border: 3px solid white;"><i class="bi bi-check-all"></i></div>
+                                    <div class="small fw-bold mt-2 text-muted" id="step4_text" style="font-size:0.7rem; line-height: 1;">Aprobado</div>
+                                    <div id="step4_info" class="text-muted" style="font-size:0.6rem;">Pendiente</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
-                <div class="row g-3 mb-3">
-                    <div class="col-md-4">
-                        <div class="card h-100 border-0 shadow-sm">
+                <div class="row g-4 mb-3">
+                    
+                    <div class="col-md-6 d-flex flex-column gap-3">
+                        
+                        <div class="card border-0 shadow-sm h-100">
                             <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
-                                <h6 class="fw-bold text-primary small text-uppercase mb-0"><i class="bi bi-person-vcard"></i> Cliente</h6>
+                                <h6 class="fw-bold text-primary small text-uppercase mb-0"><i class="bi bi-person-vcard"></i> 1. Cliente</h6>
                             </div>
                             <div class="card-body pt-2">
                                 <div class="fw-bold text-dark fs-6 mb-1 text-truncate" id="view_cliente">...</div>
@@ -241,82 +288,79 @@
                                 <div class="small text-muted"><i class="bi bi-telephone me-1"></i> <span id="view_tel">...</span></div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="col-md-4">
-                        <div class="card h-100 border-0 shadow-sm">
+                        <div class="card border-0 shadow-sm h-100">
                             <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
-                                <h6 class="fw-bold text-warning text-dark small text-uppercase mb-0"><i class="bi bi-briefcase"></i> Comercial</h6>
+                                <h6 class="fw-bold text-success small text-uppercase mb-0"><i class="bi bi-truck"></i> 2. Entrega Acordada</h6>
                             </div>
                             <div class="card-body pt-2">
-                                <table class="table table-sm table-borderless small mb-0">
-                                    <tr><td class="text-muted p-0 pb-1">Atención:</td><td class="fw-bold p-0 pb-1 text-end" id="view_atte">...</td></tr>
-                                    <tr><td class="text-muted p-0 pb-1">O/C Cliente:</td><td class="fw-bold text-primary p-0 pb-1 text-end" id="view_oc">...</td></tr>
-                                    <tr><td class="text-muted p-0 pb-1">Condición:</td><td class="p-0 pb-1 text-end"><span class="badge bg-info text-dark" id="view_pago">...</span></td></tr>
-                                    <tr><td class="text-muted p-0">Validez:</td><td class="p-0 text-end" id="view_validez">...</td></tr>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="card h-100 border-0 shadow-sm">
-                            <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
-                                <h6 class="fw-bold text-success small text-uppercase mb-0"><i class="bi bi-truck"></i> Entrega Acordada</h6>
-                            </div>
-                            <div class="card-body pt-2">
-                                <div class="d-flex justify-content-between mb-2">
+                                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
                                     <span class="badge bg-secondary" id="view_tipo_entrega">...</span>
                                     <span class="fw-bold text-danger small"><i class="bi bi-calendar-event"></i> <span id="view_fecha_entrega">...</span></span>
                                 </div>
-                                <div class="p-2 bg-light rounded border small text-muted fst-italic">
-                                    <i class="bi bi-pin-map-fill text-danger"></i> <span id="view_lugar_entrega">...</span>
+                                <div class="small text-muted mb-2">
+                                    <i class="bi bi-pin-map-fill text-danger"></i> <span id="view_lugar_entrega" class="fw-bold text-dark">...</span>
+                                </div>
+                                <div class="small bg-light p-2 rounded border mt-2">
+                                    <span class="text-muted"><i class="bi bi-building-up"></i> Agencia de Transporte:</span> 
+                                    <span id="view_agencia" class="text-primary fw-bold ms-1">...</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div id="timeline_area" class="mb-3"></div>
+                    </div>
+
+                    <div class="col-md-6 d-flex flex-column gap-3">
+                        
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
+                                <h6 class="fw-bold text-warning text-dark small text-uppercase mb-0"><i class="bi bi-briefcase"></i> 3. Info. Comercial</h6>
+                            </div>
+                            <div class="card-body pt-2">
+                                <table class="table table-sm table-borderless small mb-0">
+                                    <tr><td class="text-muted p-0 pb-2">Atención a:</td><td class="fw-bold p-0 pb-2 text-end text-dark" id="view_atte">...</td></tr>
+                                    <tr><td class="text-muted p-0 pb-2">O/C Cliente:</td><td class="fw-bold text-primary p-0 pb-2 text-end" id="view_oc">...</td></tr>
+                                    <tr><td class="text-muted p-0 pb-2">Condición Pago:</td><td class="p-0 pb-2 text-end"><span class="badge bg-info text-dark" id="view_pago">...</span></td></tr>
+                                    <tr class="border-bottom"><td class="text-muted p-0 pb-2">Validez Oferta:</td><td class="p-0 pb-2 text-end fw-bold" id="view_validez">...</td></tr>
+                                    
+                                    <tr><td colspan="2" class="pt-2 text-muted fw-bold" style="font-size: 0.7rem;">REQUISITOS ADICIONALES</td></tr>
+                                    <tr><td class="text-muted p-0 pb-1 align-middle">Certificado de Calidad:</td><td class="p-0 pb-1 text-end fs-6" id="view_calidad">...</td></tr>
+                                    <tr><td class="text-muted p-0 align-middle">Penalidad por Retraso:</td><td class="p-0 text-end fs-6" id="view_penalidad">...</td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
 
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-light py-2 border-bottom-0 d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 fw-bold small text-uppercase text-muted"><i class="bi bi-paperclip"></i> Orden de Compra (Cliente)</h6>
-                        
+                        <h6 class="mb-0 fw-bold small text-uppercase text-muted"><i class="bi bi-paperclip"></i> Orden de Compra (Adjunto)</h6>
                         <div id="view_oc_status" class="ms-auto">
                             <a href="#" id="view_oc_link" target="_blank" class="badge bg-primary text-decoration-none px-3 py-2 d-none shadow-sm">
-                                <i class="bi bi-eye-fill"></i> VER PDF ADJUNTO
+                                <i class="bi bi-eye-fill"></i> VER PDF
                             </a>
-                            <span id="view_oc_vacio" class="badge bg-secondary bg-opacity-25 text-muted fw-normal">
-                                Sin archivo
-                            </span>
+                            <span id="view_oc_vacio" class="badge bg-secondary bg-opacity-25 text-muted fw-normal">Sin archivo adjunto</span>
                         </div>
                     </div>
-                    
                     <div class="card-body py-2 px-3 bg-white rounded-bottom">
                         <div class="row g-3 align-items-center">
-                            
                             <div class="col-md-6 border-end">
-                                <label class="small text-muted fw-bold mb-1">Número O/C (Escrito)</label>
+                                <label class="small text-muted fw-bold mb-1">Cargar/Actualizar Número O/C</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text bg-light border-end-0"><i class="bi bi-hash"></i></span>
                                     <input type="text" id="input_numero_oc" class="form-control border-start-0 text-uppercase fw-bold text-dark" placeholder="Ej: 4500-123">
-                                    <button class="btn btn-outline-success" type="button" onclick="guardarSoloNumero()" title="Guardar solo el número">
-                                        <i class="bi bi-floppy2-fill"></i>
-                                    </button>
+                                    <button class="btn btn-outline-success" type="button" onclick="guardarSoloNumero()" title="Guardar solo el número"><i class="bi bi-floppy2-fill"></i></button>
                                 </div>
                             </div>
-
                             <div class="col-md-6">
-                                <label class="small text-muted fw-bold mb-1">Respaldo Digital (PDF/Foto)</label>
+                                <label class="small text-muted fw-bold mb-1">Subir Archivo PDF/Foto</label>
                                 <div class="input-group input-group-sm">
                                     <input type="file" id="input_file_oc" class="form-control" accept=".pdf,.jpg,.png,.jpeg">
-                                    <button class="btn btn-outline-primary" type="button" onclick="guardarSoloArchivo()" title="Subir archivo">
-                                        <i class="bi bi-cloud-arrow-up-fill"></i>
-                                    </button>
+                                    <button class="btn btn-outline-primary" type="button" onclick="guardarSoloArchivo()" title="Subir archivo"><i class="bi bi-cloud-arrow-up-fill"></i></button>
                                 </div>
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -370,7 +414,7 @@
                     <div class="d-flex align-items-center">
                         <div class="fs-2 me-3"><i class="bi bi-shield-x"></i></div>
                         <div>
-                            <h6 class="fw-bold text-uppercase mb-0">Corrección Requerida por Gerencia</h6>
+                            <h6 class="fw-bold text-uppercase mb-0">Corrección Requerida</h6>
                             <div class="fst-italic mt-1" id="view_motivo_rechazo">...</div>
                         </div>
                     </div>
@@ -379,14 +423,13 @@
                 <div class="alert alert-warning bg-warning bg-opacity-10 border-warning mt-3 mb-0 d-flex align-items-center small py-2">
                     <i class="bi bi-pencil-square me-2 text-warning"></i>
                     <div>
-                        <strong>Nota Interna (Vendedor):</strong> <span id="view_obs" class="text-dark">...</span>
+                        <strong>Nota (Vendedor):</strong> <span id="view_obs" class="text-dark">...</span>
                     </div>
                 </div>
 
             </div>
 
             <div class="modal-footer bg-white d-flex justify-content-between align-items-center">
-                
                 <div>
                     <a href="#" id="btn_descargar_modal" class="btn btn-outline-dark fw-bold shadow-sm">
                         <i class="bi bi-file-earmark-arrow-down-fill"></i> Descargar
@@ -394,13 +437,13 @@
                 </div>
 
                 <div class="d-flex gap-2">
-                    <a href="#" id="btn_ir_editar" class="btn btn-outline-secondary fw-bold">
+                    <button id="btn_ir_editar" class="btn btn-outline-secondary fw-bold" onclick="irAEditar()">
                         <i class="bi bi-pencil"></i> Editar
-                    </a>
+                    </button>
 
                     <div id="panel_acciones_gerencia" class="d-none">
-                        <button class="btn btn-outline-danger me-2" onclick="rechazarDesdeModal()">
-                            <i class="bi bi-x-circle"></i> Observar
+                        <button id="btn_observar_gerencia" class="btn btn-outline-danger me-2" onclick="rechazarDesdeModal()">
+                            <i class="bi bi-x-circle"></i> Observar / Devolver
                         </button>
                         <button class="btn btn-success fw-bold px-4 shadow" onclick="aprobarDesdeModal()">
                             <i class="bi bi-check-circle-fill"></i> APROBAR PEDIDO
@@ -408,8 +451,8 @@
                     </div>
 
                     <div id="panel_acciones_vendedor" class="d-none">
-                        <button class="btn btn-primary fw-bold px-4 shadow" onclick="solicitarAprobacionDesdeModal()">
-                            <i class="bi bi-send-fill"></i> Enviar a Gerencia
+                        <button class="btn btn-info text-dark border border-info fw-bold px-4 shadow" onclick="solicitarVerificacionFisicaDesdeModal()">
+                            <i class="bi bi-search"></i> Solicitar Verificación de Stock (Almacén)
                         </button>
                     </div>
                 </div>
@@ -428,16 +471,41 @@
     .nav-pills .nav-link.active { background-color: #0d6efd !important; color: #ffffff !important; border-color: #0d6efd; box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3); }
     .nav-pills .nav-link .badge { color: #fff; }
     .blink-anim { animation: blinker 2s linear infinite; }
-    .select2-container .select2-selection--single { height: 31px !important; padding-top: 2px; }
-    .select2-container--default .select2-selection--single { border: 1px solid #dee2e6; border-radius: 0.25rem; }
-    .select2-container { width: 100% !important; }
-    @keyframes blinker { 50% { opacity: 0.5; } }
 </style>
 
 <script>
+    
     let ordenIdActual = null;
 
-    // SCRIPT PARA EL MENÚ DE DESCARGA OC (MANTENIDO)
+    let ordenEstadoActual = null; // NUEVA VARIABLE PARA SABER SI ESTÁ EN REVISIÓN
+
+// NUEVA ADVERTENCIA AL EDITAR
+    function irAEditar() {
+        if(!ordenIdActual) return;
+        
+        // Si la cotización ya avanzó, lanzamos advertencia
+        if (['Por Verificar', 'Pendiente Aprobacion'].includes(ordenEstadoActual)) {
+            Swal.fire({
+                title: '¿Editar Cotización en Revisión?',
+                text: "⚠️ ADVERTENCIA: Esta cotización ya está siendo revisada. Si la editas ahora, se borrarán las firmas de Almacén y Gerencia para proteger el stock, y volverá al estado de Borrador. ¿Deseas continuar?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, Editar y Reiniciar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = `/editar_venta/${ordenIdActual}`;
+                }
+            });
+        } else {
+            // Si está en borrador normal, pasa directo
+            window.location.href = `/editar_venta/${ordenIdActual}`;
+        }
+    }
+
+    // SCRIPT PARA EL MENÚ DE DESCARGA OC
     function guardarSoloNumero() {
         if(!ordenIdActual) return;
         const numInput = document.getElementById('input_numero_oc');
@@ -459,11 +527,8 @@
     function guardarSoloArchivo() {
         if(!ordenIdActual) return;
         const fileInput = document.getElementById('input_file_oc');
-        
         if(fileInput.files.length === 0) return Swal.fire('Atención', 'Seleccione un archivo primero.', 'warning');
-
         const existeArchivo = !$('#view_oc_link').hasClass('d-none');
-        
         if(existeArchivo) {
             Swal.fire({
                 title: '¿Reemplazar Archivo?',
@@ -508,7 +573,9 @@
         });
     }
 
+    // CARGAR MODAL DE DETALLE (FUNCIÓN CORREGIDA)
     // CARGAR MODAL DE DETALLE
+// CARGAR MODAL DE DETALLE (FUNCIÓN COMPLETA CON LÍNEA DE TIEMPO)
     function verDetalleCompleto(id) {
         ordenIdActual = id;
         $('#modalTitulo').text('Cargando información...');
@@ -522,6 +589,7 @@
             .then(res => {
                 if(res.status === 'success') {
                     const d = res.data;
+                    ordenEstadoActual = d.estado; // Guardamos el estado para usarlo luego
                     const simbolo = d.moneda === 'PEN' ? 'S/' : '$';
 
                     $('#modalTitulo').html(`Cotización <span class="text-primary">#${String(d.id).padStart(5, '0')}</span>`);
@@ -538,18 +606,16 @@
                         $('#view_oc_vacio').removeClass('d-none');
                     }
                     
-                    // --- C. ESTADO DEL PEDIDO (BADGES SIMPLIFICADOS) ---
                     let badgeHtml = '<span class="badge bg-secondary">Borrador</span>';
-                    if(d.estado === 'Pendiente Aprobacion') badgeHtml = '<span class="badge bg-warning text-dark border border-dark">🟡 Pendiente Aprobación</span>';
+                    if(d.estado === 'Por Verificar') badgeHtml = '<span class="badge bg-info text-dark border border-info">🔎 En Almacén (Verificando Físico)</span>';
+                    if(d.estado === 'Pendiente Aprobacion') badgeHtml = '<span class="badge bg-warning text-dark border border-dark">⏳ En Gerencia (Stock Confirmado)</span>';
                     if(d.estado === 'Aprobado') badgeHtml = '<span class="badge bg-success">🟢 Aprobada / Lista para el cliente</span>';
                     if(d.estado === 'Anulado') badgeHtml = '<span class="badge bg-danger">🔴 Anulado</span>';
                     if(d.estado === 'Observado') badgeHtml = '<span class="badge bg-danger text-white border border-white"><i class="bi bi-exclamation-circle"></i> OBSERVADO / CORREGIR</span>';
                     $('#badgeEstadoModal').html(badgeHtml);
 
-                    // --- D. BOTÓN DE DESCARGA INTELIGENTE ---
                     const btnDescargar = document.getElementById('btn_descargar_modal');
                     btnDescargar.href = `/descargar_cotizacion/${d.id}`;
-                    
                     if (d.estado === 'Aprobado') {
                         btnDescargar.innerHTML = '<i class="bi bi-file-earmark-check-fill"></i> Descargar Orden Aprobada';
                         btnDescargar.className = 'btn btn-success fw-bold shadow-sm';
@@ -558,21 +624,26 @@
                         btnDescargar.className = 'btn btn-outline-danger fw-bold shadow-sm';
                     }
 
-                    // TIMELINE ELIMINADO TOTALMENTE DEL JS
-                    $('#timeline_area').empty();
-
+                    // --- LLENADO DE CAMPOS BÁSICOS ---
                     $('#view_cliente').text(d.cliente_nombre);
                     $('#view_ruc').text(d.cliente_doc);
                     $('#view_dir').text(d.cliente_dir);
                     $('#view_tel').text(d.cliente_tel);
+                    
                     $('#view_atte').text(d.atencion);
                     $('#view_pago').text(d.condicion_pago);
                     $('#view_validez').text(d.validez);
+                    
                     $('#view_tipo_entrega').text(d.tipo_entrega);
                     $('#view_fecha_entrega').text(d.fecha_entrega);
                     $('#view_lugar_entrega').text(d.direccion_entrega);
-                    $('#view_obs').text(d.observacion);
 
+                    // --- LLENADO DE CAMPOS NUEVOS (AGENCIA, CALIDAD, PENALIDAD) ---
+                    $('#view_calidad').html(d.control_calidad === 'SI' ? '<span class="text-success fw-bold">✅ SÍ</span>' : '❌ NO');
+                    $('#view_penalidad').html(d.penalidad === 'SI' ? '<span class="text-danger fw-bold">⚠️ SÍ</span>' : '❌ NO');
+                    $('#view_agencia').text(d.agencia || 'NO REQUIERE');
+                    
+                    $('#view_obs').text(d.observacion);
                     if (d.estado === 'Observado' && d.motivo_rechazo) {
                         $('#view_motivo_rechazo').text(d.motivo_rechazo);
                         $('#box_motivo_rechazo').removeClass('d-none'); 
@@ -580,6 +651,7 @@
                         $('#box_motivo_rechazo').addClass('d-none');
                     }
 
+                    // --- LLENAR TABLA DE PRODUCTOS ---
                     const tbody = $('#view_tabla_items'); 
                     tbody.empty();
                     
@@ -620,7 +692,49 @@
                     $('#view_igv').text(d.igv.toFixed(2));
                     $('#view_total').text(simbolo + " " + d.total.toFixed(2));
 
-                    configurarBotones(d.estado, "{{ session.get('role') }}", id);
+                    // --- DIBUJAR LÍNEA DE TIEMPO (TIMELINE) ---
+                    $('#step1_info').text(d.creador);
+                    
+                    let progreso = 0;
+                    
+                    // PASO 2 AHORA ES ALMACÉN
+                    if (d.f_verif_almacen) {
+                        progreso = 33;
+                        $('#step2_icon').removeClass('bg-light text-muted').addClass('bg-success text-white');
+                        $('#step2_text').removeClass('text-muted').addClass('text-dark');
+                        $('#step2_info').html(`${d.almacenero}<br>${d.f_verif_almacen}`);
+                    } else {
+                        $('#step2_icon').removeClass('bg-success text-white').addClass('bg-light text-muted');
+                        $('#step2_text').removeClass('text-dark').addClass('text-muted');
+                        $('#step2_info').text('Pendiente');
+                    }
+
+                    // PASO 3 AHORA ES CLIENTE
+                    if (d.cliente_confirmado) {
+                        progreso = 66;
+                        $('#step3_icon').removeClass('bg-light text-muted').addClass('bg-success text-white');
+                        $('#step3_text').removeClass('text-muted').addClass('text-dark');
+                        $('#step3_info').text(d.f_conf_cliente);
+                    } else {
+                        $('#step3_icon').removeClass('bg-success text-white').addClass('bg-light text-muted');
+                        $('#step3_text').removeClass('text-dark').addClass('text-muted');
+                        $('#step3_info').text('Pendiente');
+                    }
+
+                    // Paso 4: Gerencia
+                    if (d.f_aprobacion) {
+                        progreso = 100;
+                        $('#step4_icon').removeClass('bg-light text-muted').addClass('bg-success text-white');
+                        $('#step4_text').removeClass('text-muted').addClass('text-dark');
+                        $('#step4_info').html(`${d.gerente}<br>${d.f_aprobacion}`);
+                    } else {
+                        $('#step4_icon').removeClass('bg-success text-white').addClass('bg-light text-muted');
+                        $('#step4_text').removeClass('text-dark').addClass('text-muted');
+                        $('#step4_info').text('Pendiente');
+                    }
+
+                    $('#timeline_bar').css('width', `${progreso}%`);
+                    configurarBotones(d.estado, "{{ session.get('role') }}", id, d.vendedor_id, d.cliente_confirmado);
 
                 } else {
                     Swal.fire('Error', res.msg, 'error');
@@ -633,41 +747,83 @@
             });
     }
 
-    function configurarBotones(estado, rol, id) {
+    // LOGICA DE OCULTAR BOTONES INTELIGENTE
+    function configurarBotones(estado, rol, id, vendedor_id, cliente_confirmado) {
         const btnEditar = document.getElementById('btn_ir_editar');
         const panelGerencia = document.getElementById('panel_acciones_gerencia');
         const panelVendedor = document.getElementById('panel_acciones_vendedor');
+        const btnObservarGerencia = document.getElementById('btn_observar_gerencia');
         
         btnEditar.classList.add('d-none'); 
         panelGerencia.classList.add('d-none'); 
         panelVendedor.classList.add('d-none');
 
-        if (rol === 'admin' || rol === 'administracion') {
-            if (['Cotizacion', 'Observado'].includes(estado)) { 
-                btnEditar.classList.remove('d-none'); 
-                btnEditar.href = `/editar_venta/${id}`; 
-                panelGerencia.classList.remove('d-none'); 
-            }
-            else if (estado === 'Pendiente Aprobacion') { 
-                panelGerencia.classList.remove('d-none'); 
-            }
+        const miUsuarioId = parseInt("{{ session.get('user_id') }}");
+        const esMiCotizacion = (parseInt(vendedor_id) === miUsuarioId);
+
+        // Puede editar en cualquier estado previo a Aprobación final
+        if (['Cotizacion', 'Observado', 'Por Verificar', 'Stock Confirmado', 'Pendiente Aprobacion'].includes(estado) && esMiCotizacion) {
+            btnEditar.classList.remove('d-none'); 
         }
-        else if (rol === 'vendedor') {
-            if (['Cotizacion', 'Observado'].includes(estado)) { 
-                btnEditar.classList.remove('d-none'); 
-                btnEditar.href = `/editar_venta/${id}`; 
-                panelVendedor.classList.remove('d-none'); 
+
+        // ACCIÓN 1: VENDEDOR MANDA A ALMACÉN
+        if (['Cotizacion', 'Observado'].includes(estado) && esMiCotizacion) {
+            panelVendedor.classList.remove('d-none');
+            panelVendedor.innerHTML = `
+                <button class="btn btn-info text-dark border border-info fw-bold px-4 shadow" onclick="solicitarVerificacionFisicaDesdeModal()">
+                    <i class="bi bi-search"></i> Pedir Verificación a Almacén
+                </button>
+            `;
+        }
+
+        // ACCIÓN 2: ALMACÉN YA DIJO "SÍ HAY". AHORA EL VENDEDOR CONFIRMA CON EL CLIENTE.
+        if (estado === 'Stock Confirmado' && esMiCotizacion) {
+            panelVendedor.classList.remove('d-none');
+            panelVendedor.innerHTML = `
+                <button class="btn btn-success fw-bold px-4 shadow" onclick="marcarConfirmacionCliente(${id})">
+                    <i class="bi bi-person-check-fill"></i> El Cliente Confirmó (Enviar a Gerencia)
+                </button>
+            `;
+        }
+
+        // ACCIÓN 3: GERENCIA APRUEBA
+        if ((rol === 'admin' || rol === 'administracion') && estado === 'Pendiente Aprobacion') {
+            panelGerencia.classList.remove('d-none'); 
+            if (btnObservarGerencia) {
+                if (esMiCotizacion) btnObservarGerencia.classList.add('d-none');
+                else btnObservarGerencia.classList.remove('d-none');
             }
         }
     }
 
+    function marcarConfirmacionCliente(id) {
+        Swal.fire({
+            title: '¿El cliente aceptó la cotización?',
+            text: "Al confirmar, se habilitará el botón para enviar el pedido al Almacén para su separación física.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, confirmar',
+            confirmButtonColor: '#198754'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/api/confirmar_cliente/${id}`, { method: 'POST' })
+                .then(r => r.json()).then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire('¡Confirmado!', 'Ahora puedes enviarlo a Almacén.', 'success').then(() => verDetalleCompleto(id));
+                    } else { Swal.fire('Error', data.msg, 'error'); }
+                });
+            }
+        });
+    }
+
+    // ACCIONES GERENCIA
     function aprobarGerencia(id) {
         Swal.fire({
             title: '¿Aprobar Cotización?',
-            html: `<div class="text-start fs-6"><p>Al aprobar, se realizarán las siguientes acciones:</p><ul class="text-muted small"><li>Se generará la <b>Cotización Aprobada</b> (Orden de Pedido).</li><li><b>Se descontará el Stock</b> del inventario inmediatamente.</li><li>El pedido quedará listo para entregarse al cliente.</li></ul></div>`,
+            html: `<div class="text-start fs-6"><p>Al aprobar, se realizarán las siguientes acciones:</p><ul class="text-muted small"><li>Se generará la <b>Cotización Aprobada</b> (Orden de Pedido).</li><li><b>Pasará a la pestaña de Despacho en Almacén</b>.</li></ul></div>`,
             icon: 'warning', 
             showCancelButton: true, 
-            confirmButtonText: '✅ Confirmar y Descontar Stock', 
+            confirmButtonText: '✅ Confirmar', 
             confirmButtonColor: '#198754', 
             cancelButtonText: 'Cancelar', 
             showLoaderOnConfirm: true,
@@ -681,29 +837,41 @@
     function rechazarDesdeModal() { if(!ordenIdActual) return; bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide(); rechazarCotizacion(ordenIdActual); }
     function rechazarCotizacion(id) {
         Swal.fire({
-            title: 'Observar / Devolver', text: "Indique al vendedor qué debe corregir (Precio, Cantidad, Datos, etc):", input: 'textarea', inputPlaceholder: 'Ej: El precio es muy bajo, subir a...', inputAttributes: { 'aria-label': 'Ingrese el motivo' }, icon: 'warning', showCancelButton: true, confirmButtonText: 'Devolver a Vendedor', confirmButtonColor: '#ffc107', cancelButtonText: 'Cancelar',
+            title: 'Observar / Devolver', text: "Indique al vendedor qué debe corregir (Precio, Condiciones, etc):", input: 'textarea', inputPlaceholder: 'Ej: El precio es muy bajo, subir a...', inputAttributes: { 'aria-label': 'Ingrese el motivo' }, icon: 'warning', showCancelButton: true, confirmButtonText: 'Devolver a Vendedor', confirmButtonColor: '#ffc107', cancelButtonText: 'Cancelar',
             inputValidator: (value) => { if (!value) return '¡Debe escribir un motivo para que el vendedor entienda!'; }
         }).then((result) => {
             if (result.isConfirmed) {
-                fetch('/gestion_ventas/observar', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ order_id: id, motivo: result.value }) })
+                fetch('/gestion_ventas/observar', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ order_id: id, motivo: "GERENCIA: " + result.value }) })
                 .then(r => r.json()).then(data => { if(data.status === 'success') { Swal.fire('Observado', 'La cotización ha sido devuelta al vendedor con sus observaciones.', 'success').then(() => location.reload()); } else { Swal.fire('Error', data.msg, 'error'); } });
             }
         });
     }
 
-    function solicitarAprobacionDesdeModal() { if(!ordenIdActual) return; bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide(); solicitarAprobacion(ordenIdActual); }
-    function solicitarAprobacion(id) {
-        Swal.fire({ title: '¿Enviar a Gerencia?', text: "Su cotización quedará bloqueada para revisión. Asegúrese de que los precios y datos sean correctos.", icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, Enviar a Revisión', confirmButtonColor: '#0d6efd', cancelButtonText: 'Cancelar'
-        }).then((r) => { if(r.isConfirmed) { cambiarEstadoAPI(id, 'Pendiente Aprobacion', 'Enviado exitosamente. Espere respuesta.'); } });
+    // ACCIONES VENDEDOR (NUEVO FLUJO: A ALMACEN)
+    function solicitarVerificacionFisicaDesdeModal() { 
+        if(!ordenIdActual) return; 
+        bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide(); 
+        solicitarVerificacionFisica(ordenIdActual); 
+    }
+
+    function solicitarVerificacionFisica(id) {
+        Swal.fire({ 
+            title: '¿Solicitar Verificación?', 
+            text: "Se enviará la cotización al Almacén para que verifiquen el stock físico antes de la aprobación final.", 
+            icon: 'question', 
+            showCancelButton: true, 
+            confirmButtonText: 'Sí, Enviar a Almacén', 
+            confirmButtonColor: '#0dcaf0', 
+            cancelButtonText: 'Cancelar'
+        }).then((r) => { 
+            if(r.isConfirmed) { 
+                cambiarEstadoAPI(id, 'Por Verificar', 'Enviado a Almacén. Espere la confirmación de stock físico.'); 
+            } 
+        });
     }
 
     function aprobarDesdeModal() { if(ordenIdActual) { bootstrap.Modal.getInstance(document.getElementById('modalDetalleCompleto')).hide(); aprobarGerencia(ordenIdActual); } }
     
-    function anularOrden(id) {
-        Swal.fire({ title: '¿Anular Documento?', text: "Esta acción invalidará la cotización. No se borrará del sistema (quedará como historial), pero no podrá recuperarse.", icon: 'error', showCancelButton: true, confirmButtonText: 'Sí, Anular Definitivamente', confirmButtonColor: '#dc3545', cancelButtonText: 'No, mantener'
-        }).then((r) => { if(r.isConfirmed) { cambiarEstadoAPI(id, 'Anulado', 'La cotización ha sido anulada.'); } });
-    }
-
     function cambiarEstadoAPI(id, nuevoEstado, mensajeExito) {
         fetch(`/cambiar_estado/${id}/${nuevoEstado}`).then(response => { if (!response.ok) throw new Error("Permiso denegado o error del servidor"); return response.json(); })
             .then(() => { Swal.fire('Correcto', mensajeExito, 'success').then(() => location.reload()); }).catch(err => { Swal.fire('Error', 'No se pudo realizar la acción. Verifique sus permisos.', 'error'); });

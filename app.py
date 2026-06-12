@@ -216,6 +216,13 @@ def consulta_documento():
     # CASO B: Consultar API (Costo)
     print(f">>> [API] Consultando datos externos para {numero}...")
     TOKEN = os.getenv('SUNAT_API_KEY')
+    # CASO B: Consultar API (Costo)
+    print(f">>> [API] Consultando datos externos para {numero}...")
+    
+    # --- CAMBIO AQUÍ PARA USO LOCAL ---
+    TOKEN = "sk_12670.mczJWCBkAFXbV3pYZdD6EoxkwZ7SZSME"
+    # ----------------------------------
+    
     URL_RUC = "https://api.decolecta.com/v1/sunat/ruc"
     URL_DNI = "https://api.decolecta.com/v1/reniec/dni"
     
@@ -360,9 +367,14 @@ def obtener_tipo_cambio(usuario_solicitante="Sistema", forzar=False):
             return float(config.value)
 
     # 2. CONSULTA API (Solo si pasó los filtros)
+    # 2. CONSULTA API (Solo si pasó los filtros)
     if debo_consultar:
         print(f"--- 🟢 API SUNAT ({motivo_consulta}) ---")
-        TOKEN = os.getenv('SUNAT_API_KEY')
+        
+        # --- CAMBIO AQUÍ PARA USO LOCAL ---
+        TOKEN = "sk_12670.mczJWCBkAFXbV3pYZdD6EoxkwZ7SZSME"
+        # ----------------------------------
+        
         URL = "https://api.decolecta.com/v1/tipo-cambio/sunat"
         
         try:
@@ -987,6 +999,12 @@ def nueva_venta():
     if request.method == 'POST':
         try:
             data = request.get_json()
+
+            # >>> IMPRESIÓN DE CONTROL PARA NUEVA COTIZACIÓN <<<
+            print("\n========================================")
+            print("👉 INTENTANDO CREAR NUEVA COTIZACIÓN:")
+            print(f"Agencia: {data.get('agencia')} | Calidad: {data.get('control_calidad')} | Penalidad: {data.get('penalidad')}")
+            print("========================================\n")
             
             # 1. GESTIÓN DEL CLIENTE
             cliente = Client.query.filter_by(documento=data.get('cliente_ruc')).first()
@@ -1098,6 +1116,9 @@ def nueva_venta():
                 tipo_entrega=tipo_entrega,
                 direccion_envio=dir_entrega_final,
                 fecha_entrega=fecha_obj,
+                agencia=data.get('agencia', 'NO REQUIERE'),              # <--- ASEGÚRATE DE ESTO
+                control_calidad=data.get('control_calidad', 'NO'),       # <--- ASEGÚRATE DE ESTO
+                penalidad=data.get('penalidad', 'NO'),                   # <--- ASEGÚRATE DE ESTO
                 # fecha_vencimiento=fecha_vencimiento_calc, # Descomentar si agregaste el campo al modelo
 
                 estado='Cotizacion',
@@ -2313,7 +2334,11 @@ def aprobar_cotizacion_gerencia(order_id):
 
         # 2. CAMBIO DE ESTADO (El stock NO se toca aquí)
         orden.estado = 'Aprobado' 
+        
+        # --- NUEVO: REGISTRO DE QUIÉN Y CUÁNDO APROBÓ (TIMELINE) ---
         orden.fecha_aprobacion = hora_peru() 
+        orden.gerente_nombre = session.get('nombre')    # Guarda qué gerente aprobó
+        # -----------------------------------------------------------
         
         db.session.commit()
         
@@ -2344,45 +2369,45 @@ def historial_ventas():
     
     # 2. CONTADORES (Para los globos rojos/amarillos)
     cuentas = {
-        'rev': Order.query.filter_by(estado='Pendiente Aprobacion').count(),
+        'rev': Order.query.filter(Order.estado.in_(['Por Verificar', 'Pendiente Aprobacion'])).count(),
         'obs': 0
     }
     if rol == 'vendedor':
         cuentas['obs'] = Order.query.filter(Order.vendedor_id == user_id, Order.estado == 'Observado').count()
+        # El vendedor solo ve en el globo amarillo sus propios pedidos que están en revisión
+        cuentas['rev'] = Order.query.filter(Order.vendedor_id == user_id, Order.estado.in_(['Por Verificar', 'Pendiente Aprobacion'])).count()
 
-    # --- 3. APLICAR LÓGICA DE PESTAÑAS (PRIMERO) ---
-    # Esto define "dónde" vamos a buscar.
-    
+
+    # CAPTURAMOS EL NUEVO INTERRUPTOR
+    solo_mias = request.args.get('solo_mias') == 'on'
+
+    # --- 3. APLICAR LÓGICA DE PESTAÑAS Y PRIVACIDAD ---
     vista = request.args.get('vista', 'borradores')
 
     if vista == 'borradores':
-        query = query.filter(Order.estado.in_(['Cotizacion', 'Observado']))
-        # REGLA DE ORO: En borradores, CADA UNO VE SOLO LO SUYO.
-        # Así el Admin no ve el "ruido" de los borradores de Juan.
-        query = query.filter(Order.vendedor_id == user_id)
+        # Agregamos 'Stock Confirmado' a la lista
+        query = query.filter(Order.estado.in_(['Cotizacion', 'Observado', 'Stock Confirmado']))
+        if rol == 'vendedor' or solo_mias: 
+            query = query.filter(Order.vendedor_id == user_id)
 
     elif vista == 'revision':
-        query = query.filter(Order.estado == 'Pendiente Aprobacion')
-        # Admin ve todo. Vendedor solo lo suyo.
-        if rol == 'vendedor': query = query.filter(Order.vendedor_id == user_id)
+        query = query.filter(Order.estado.in_(['Por Verificar', 'Pendiente Aprobacion']))
+        if rol == 'vendedor' or solo_mias: 
+            query = query.filter(Order.vendedor_id == user_id)
 
-    elif vista == 'activos':
-        query = query.filter(Order.estado.in_(['Aprobado', 'Despachado']))
-        if rol == 'vendedor': query = query.filter(Order.vendedor_id == user_id)
+    elif vista == 'historial':
+        query = query.filter(Order.estado.in_(['Aprobado', 'Despachado', 'Entregado', 'Anulado', 'Rechazado']))
+        if rol == 'vendedor' or solo_mias: 
+            query = query.filter(Order.vendedor_id == user_id)
 
-    elif vista == 'cerrados':
-        query = query.filter(Order.estado.in_(['Entregado', 'Anulado', 'Rechazado']))
-        if rol == 'vendedor': query = query.filter(Order.vendedor_id == user_id)
+    # --- 4. AHORA APLICAMOS LA BÚSQUEDA ---
+    # ... (el resto del código queda igual: busqueda, filtro_cliente, fechas, paginación) ...
 
-    # --- 4. AHORA APLICAMOS LA BÚSQUEDA (SOBRE LA VISTA YA FILTRADA) ---
+    # --- 4. AHORA APLICAMOS LA BÚSQUEDA ---
     busqueda = request.args.get('busqueda')
-    
     if busqueda:
-        # Preparamos el ID numérico
         term_id = busqueda
         if busqueda.isdigit(): term_id = str(int(busqueda))
-
-        # Aplicamos el filtro de texto ENCIMA de los filtros de pestaña
         query = query.join(Client).join(User).filter(
             or_(
                 Client.nombre.ilike(f"%{busqueda}%"),
@@ -2394,16 +2419,11 @@ def historial_ventas():
         )
 
     # 5. OTROS FILTROS (Cliente Select, Fechas, Vendedor Dropdown)
-    
-    # Filtro Cliente (Select2)
     filtro_cliente_ruc = request.args.get('filtro_cliente')
-    cliente_obj_filtro = None
     if filtro_cliente_ruc:
         cliente_obj_filtro = Client.query.filter_by(documento=filtro_cliente_ruc).first()
-        if cliente_obj_filtro:
-            query = query.filter(Order.cliente_id == cliente_obj_filtro.id)
+        if cliente_obj_filtro: query = query.filter(Order.cliente_id == cliente_obj_filtro.id)
 
-    # Filtro Fechas
     fecha_inicio = request.args.get('fecha_inicio')
     fecha_fin = request.args.get('fecha_fin')
     if fecha_inicio and fecha_fin:
@@ -2413,22 +2433,17 @@ def historial_ventas():
             query = query.filter(Order.fecha.between(start, end))
         except: pass
 
-    # Filtro Vendedor (Dropdown del Admin)
     filtro_vendedor = request.args.get('filtro_vendedor')
     if rol != 'vendedor' and filtro_vendedor and filtro_vendedor != 'todos':
-        # Si estás en 'borradores', este filtro no servirá de mucho (porque ya filtramos por user_id),
-        # pero en 'activos' o 'historial' es muy útil.
         query = query.filter(Order.vendedor_id == filtro_vendedor)
 
     # 6. EJECUCIÓN
     query = query.order_by(Order.fecha.desc())
-    
     page = request.args.get('page', 1, type=int)
     per_page = 20 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     ordenes = pagination.items 
     
-    # Cargamos clientes para el select (Al final para optimizar carga si falla algo antes)
     clientes = Client.query.order_by(Client.nombre).limit(2000).all()
 
     return render_template('historial_ventas.html', 
@@ -2438,7 +2453,7 @@ def historial_ventas():
                            cuentas=cuentas,
                            vendedores=vendedores,
                            clientes=clientes,
-                           cliente_seleccionado=filtro_cliente_ruc, # Corrección de nombre variable para el template
+                           cliente_seleccionado=filtro_cliente_ruc,
                            hoy=hora_peru().date())
 
 
@@ -2451,9 +2466,9 @@ def editar_venta(order_id):
     # 1. Obtener la orden
     orden = Order.query.get_or_404(order_id)
     
-    # Validar: Si ya está despachado, no se debería editar tan fácil
-    if orden.estado in ['Despachado', 'Entregado']:
-        flash('⚠️ No se puede editar un pedido ya despachado.')
+    # CAMBIO: Permitimos editar si está en validación, pero BLOQUEAMOS si ya se aprobó
+    if orden.estado in ['Aprobado', 'Despachado', 'Entregado', 'Anulado', 'Rechazado']:
+        flash('⚠️ No se puede editar un pedido que ya está aprobado o finalizado.')
         return redirect(url_for('historial_ventas'))
 
     # 2. Reconstruir el "Carrito" para Javascript
@@ -2530,6 +2545,12 @@ def actualizar_venta():
     
     try:
         data = request.get_json()
+
+        # >>> IMPRESIÓN DE CONTROL PARA ACTUALIZAR COTIZACIÓN <<<
+        print("\n========================================")
+        print("👉 INTENTANDO ACTUALIZAR COTIZACIÓN:")
+        print(f"Agencia: {data.get('agencia')} | Calidad: {data.get('control_calidad')} | Penalidad: {data.get('penalidad')}")
+        print("========================================\n")
         order_id = data.get('order_id') # Recibimos el ID
         
         if not order_id:
@@ -2539,9 +2560,9 @@ def actualizar_venta():
         orden = Order.query.get_or_404(order_id)
         
         # 2. VALIDAR ESTADO (Seguridad)
-        # Solo se puede editar si está en Borrador u Observado
-        if orden.estado not in ['Cotizacion', 'Observado']:
-             return {'status': 'error', 'msg': 'No se puede editar una orden en proceso o cerrada.'}
+        # CAMBIO CLAVE: Bloqueamos SOLO los estados finales.
+        if orden.estado in ['Aprobado', 'Despachado', 'Entregado', 'Anulado', 'Rechazado']:
+             return {'status': 'error', 'msg': 'No se puede editar un pedido finalizado o aprobado.'}
 
         # 3. ACTUALIZAR DATOS CABECERA (Sobreescribir)
         orden.atencion = data.get('cliente_atte')
@@ -2554,8 +2575,23 @@ def actualizar_venta():
         f_entrega = data.get('fecha_entrega')
         if f_entrega:
             orden.fecha_entrega = datetime.strptime(f_entrega, '%Y-%m-%d').date()
-        orden.tipo_entrega = data.get('tipo_entrega')
-        orden.direccion_envio = data.get('direccion_entrega')
+        else:
+            orden.fecha_entrega = None
+            
+        # Corregimos el problema de la dirección vacía en Recojo
+        tipo_ent = data.get('tipo_entrega')
+        dir_ent = data.get('direccion_entrega')
+        if tipo_ent == 'Recojo':
+            dir_ent = "RECOJO EN TIENDA / ALMACÉN"
+            
+        orden.tipo_entrega = tipo_ent
+        orden.direccion_envio = dir_ent
+        
+        # --- AQUÍ GUARDAMOS LOS CAMPOS NUEVOS AL EDITAR ---
+        # Aseguramos de que si llega vacío, ponga 'NO' en la base de datos
+        orden.agencia = data.get('agencia') or 'NO REQUIERE'
+        orden.control_calidad = data.get('control_calidad') or 'NO'
+        orden.penalidad = data.get('penalidad') or 'NO'
         
         # Totales
         orden.moneda = data.get('moneda')
@@ -2567,14 +2603,16 @@ def actualizar_venta():
         orden.descuento_valor = float(data.get('descuento_valor', 0))
         orden.descuento_total = float(data.get('descuento_total', 0))
 
-        # --- IMPORTANTE: SI ESTABA OBSERVADO, LO DEVOLVEMOS A BORRADOR (O LO DEJAMOS EN OBSERVADO?) ---
-        # Lo lógico es que si el vendedor edita, ya corrigió.
-        # Opción A: Se queda en 'Cotizacion' (Borrador) para que él decida cuándo enviar de nuevo.
-        # Opción B: Se envía directo a aprobación.
-        # Recomendado: Volver a 'Cotizacion' (Borrador) para que él revise antes de enviar.
-        if orden.estado == 'Observado':
-             orden.estado = 'Cotizacion' 
-
+        # --- REGLA ESTRICTA DE PING-PONG ---
+        # Si se edita la cotización en CUALQUIER estado permitido, TODO vuelve a cero.
+        orden.estado = 'Cotizacion' 
+        orden.cliente_confirmado = False
+        orden.fecha_confirmacion_cliente = None
+        orden.fecha_verificacion_almacen = None
+        orden.almacenero_nombre = None
+        orden.fecha_aprobacion = None
+        orden.gerente_nombre = None
+             
         # 4. ACTUALIZAR ITEMS (Estrategia: Borrar viejos y crear nuevos)
         # Esto es lo más limpio para evitar errores de duplicados en items
         OrderDetail.query.filter_by(order_id=orden.id).delete()
@@ -2615,6 +2653,21 @@ def actualizar_venta():
     except Exception as e:
         db.session.rollback()
         return {'status': 'error', 'msg': str(e)}, 500
+    
+@app.route('/api/confirmar_cliente/<int:order_id>', methods=['POST'])
+def confirmar_cliente(order_id):
+    orden = Order.query.get_or_404(order_id)
+    
+    if orden.vendedor_id != session.get('user_id'):
+        return {'status': 'error', 'msg': 'Solo el creador de esta cotización puede confirmarla.'}, 403
+        
+    orden.cliente_confirmado = True
+    orden.fecha_confirmacion_cliente = hora_peru()
+    # CAMBIO: Ahora sí, viaja a Gerencia
+    orden.estado = 'Pendiente Aprobacion' 
+    
+    db.session.commit()
+    return {'status': 'success', 'msg': 'Confirmación registrada. Enviado a Gerencia para revisión final.'}
 
 @app.route('/api/obtener_detalle_venta/<int:order_id>')
 def obtener_detalle_venta(order_id):
@@ -2671,6 +2724,7 @@ def obtener_detalle_venta(order_id):
         # 3. Datos Generales (Manejo de nulos con "or '-'")
         data = {
             'id': orden.id,
+            'vendedor_id': orden.vendedor_id,
             'fecha': orden.fecha.strftime('%d/%m/%Y %H:%M'),
             'estado': orden.estado,
             'vendedor': orden.vendedor.nombre_completo if orden.vendedor else 'Desconocido',
@@ -2681,13 +2735,18 @@ def obtener_detalle_venta(order_id):
             'cliente_dir': orden.cliente.direccion or '-',
             'cliente_tel': orden.cliente.telefono or '-',
             
-            # Info
+            # Reemplaza la parte de Info y Logística por esto:
             'atencion': orden.atencion or '-',
             'orden_compra': orden.orden_compra or '-',
             'condicion_pago': orden.condicion_pago or '-',
             'validez': orden.validez_oferta or '-',
-            'observacion': orden.observacion or 'Ninguna', # Nota del Vendedor
-            'motivo_rechazo': orden.motivo_rechazo or '',  # Nota del Gerente (NUEVO)
+            'observacion': orden.observacion or 'Ninguna',
+            'motivo_rechazo': orden.motivo_rechazo or '', 
+            
+            # ---> DATOS NUEVOS ASEGURADOS <---
+            'agencia': orden.agencia or 'NO REQUIERE',
+            'control_calidad': orden.control_calidad or 'NO',
+            'penalidad': orden.penalidad or 'NO',
             
             # Logística
             'tipo_entrega': orden.tipo_entrega or '-',
@@ -2704,7 +2763,18 @@ def obtener_detalle_venta(order_id):
             'peso_total': orden.peso_total,
             'cantidad_bultos': orden.cantidad_bultos,
             
-            'items': items_data
+            'items': items_data,
+
+            # --- LÍNEA DE TIEMPO ---
+            'creador': orden.vendedor.nombre_completo if orden.vendedor else 'Vendedor',
+            'cliente_confirmado': orden.cliente_confirmado,
+            'f_conf_cliente': orden.fecha_confirmacion_cliente.strftime('%d/%m/%Y %H:%M') if orden.fecha_confirmacion_cliente else None,
+            
+            'almacenero': orden.almacenero_nombre,
+            'f_verif_almacen': orden.fecha_verificacion_almacen.strftime('%d/%m/%Y %H:%M') if orden.fecha_verificacion_almacen else None,
+            
+            'gerente': orden.gerente_nombre,
+            'f_aprobacion': orden.fecha_aprobacion.strftime('%d/%m/%Y %H:%M') if orden.fecha_aprobacion else None,
         }
         
         return {'status': 'success', 'data': data}
@@ -2746,10 +2816,34 @@ def picking_almacen():
     if session.get('role') not in ['admin', 'almacen']: 
         return "Acceso denegado", 403
     
-    # Solo traemos las cotizaciones que Gerencia ya aprobó
+    # 1. Cotizaciones que el vendedor mandó a revisar físicamente
+    ordenes_por_verificar = Order.query.filter_by(estado='Por Verificar').order_by(Order.fecha.asc()).all()
+    
+    # 2. Cotizaciones que Gerencia ya aprobó y deben descontarse del sistema
     ordenes_pendientes = Order.query.filter_by(estado='Aprobado').order_by(Order.fecha.asc()).all()
     
-    return render_template('picking_almacen.html', ordenes=ordenes_pendientes)
+    return render_template('picking_almacen.html', 
+                           ordenes_verificar=ordenes_por_verificar,
+                           ordenes=ordenes_pendientes)
+
+# NUEVA RUTA PARA QUE ALMACÉN APRUEBE EL STOCK FÍSICO
+# NUEVA RUTA PARA QUE ALMACÉN APRUEBE EL STOCK FÍSICO
+@app.route('/api/confirmar_stock_fisico/<int:order_id>', methods=['POST'])
+def confirmar_stock_fisico(order_id):
+    if session.get('role') not in ['admin', 'almacen']: 
+        return {'status': 'error', 'msg': 'No autorizado'}, 403
+    
+    orden = Order.query.get_or_404(order_id)
+    if orden.estado == 'Por Verificar':
+        # CAMBIO: Pasa a 'Stock Confirmado' en lugar de Gerencia
+        orden.estado = 'Stock Confirmado'
+        
+        orden.fecha_verificacion_almacen = hora_peru()
+        orden.almacenero_nombre = session.get('nombre')
+        db.session.commit()
+        return {'status': 'success', 'msg': 'Stock verificado. Ahora el Vendedor debe pedir confirmación al cliente.'}
+    
+    return {'status': 'error', 'msg': 'El pedido no está en estado de verificación.'}
 
 @app.route('/api/procesar_salida_almacen/<int:order_id>', methods=['POST'])
 def procesar_salida_almacen(order_id):
@@ -2811,6 +2905,28 @@ def procesar_salida_almacen(order_id):
     except Exception as e:
         db.session.rollback()
         return {'status': 'error', 'msg': f'Error en el descargo: {str(e)}'}
+    
+
+# --- RUTA SECRETA PARA INICIALIZAR LA BASE DE DATOS EN RENDER ---
+@app.route('/setup_db_secreta')
+def setup_db_secreta():
+    try:
+        db.create_all()
+        # Verificamos si ya existe el admin para no duplicarlo
+        admin_existe = User.query.filter_by(username='admin').first()
+        if not admin_existe:
+            admin = User(
+                username='admin', 
+                password=generate_password_hash('123456'), 
+                nombre_completo='Administrador General', 
+                role='admin'
+            )
+            db.session.add(admin)
+            db.session.commit()
+            return "<h1>¡Éxito!</h1><p>Base de datos inicializada y usuario admin creado.</p>"
+        return "<h1>Aviso</h1><p>La base de datos ya estaba inicializada.</p>"
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p>"
 
 # --- ARRANQUE DE LA APLICACIÓN ---
 if __name__ == '__main__':
