@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    @page {
+        size: letter;
+        margin: 1.2cm 1.3cm;
+    }
+    body {
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 9pt;
+        color: #000000;
+    }
+    table {
+        width: 100%;
+    }
+    td {
+        vertical-align: top;
+        padding: 2px;
+    }
+    /* xhtml2pdf no soporta border-collapse: los bordes se definen por celda */
+
+    /* ---------- ENCABEZADO ---------- */
+    .header-table td {
+        vertical-align: middle;
+        padding: 0;
+    }
+    .logo-cell {
+        width: 28%;
+        text-align: center;
+    }
+    .logo-cell img {
+        width: 70px;
+    }
+    .empresa-nombre {
+        font-size: 12pt;
+        font-weight: bold;
+        color: #1a1a1a;
+        text-align: center;
+    }
+    .empresa-datos {
+        font-size: 7.5pt;
+        text-align: center;
+        line-height: 1.3;
+    }
+    .ruc-box {
+        border: 2px solid #000000;
+        text-align: center;
+        padding: 4px 6px;
+        font-weight: bold;
+        font-size: 10pt;
+    }
+    .cotizacion-box {
+        border: 2px solid #000000;
+        border-top: none;
+        text-align: center;
+        padding: 6px;
+        font-weight: bold;
+        font-size: 14pt;
+        background-color: #f2f2f2;
+    }
+    .numero-box {
+        border: 2px solid #000000;
+        border-top: none;
+        text-align: center;
+        padding: 4px 6px;
+        font-weight: bold;
+        font-size: 10pt;
+    }
+
+    /* ---------- DATOS CLIENTE / VENDEDOR ---------- */
+    .datos-wrap {
+        border: 1px solid #000000;
+        margin-top: 10px;
+    }
+    .datos-table td {
+        font-size: 8.5pt;
+        padding: 3px 6px;
+    }
+    .datos-table .label {
+        font-weight: bold;
+        width: 18%;
+    }
+    .datos-divider {
+        width: 1%;
+        border-left: 1px solid #000000;
+    }
+
+    .intro-text {
+        margin-top: 10px;
+        margin-bottom: 6px;
+        font-size: 9pt;
+    }
+
+    /* ---------- TABLA DE ITEMS ---------- */
+    .items-table {
+        border: 1px solid #000000;
+    }
+    .items-table th {
+        background-color: #d9d9d9;
+        border: 1px solid #000000;
+        font-size: 8pt;
+        text-transform: uppercase;
+        padding: 4px 3px;
+        text-align: center;
+    }
+    .items-table td {
+        border: 1px solid #000000;
+        font-size: 8.5pt;
+        padding: 4px 3px;
+    }
+    .col-itm    { width: 5%;  text-align: center; }
+    .col-codigo { width: 12%; text-align: center; }
+    .col-desc   { width: 38%; text-align: left;   }
+    .col-um     { width: 7%;  text-align: center; }
+    .col-cant   { width: 8%;  text-align: center; }
+    .col-unit   { width: 14%; text-align: right;  }
+    .col-total  { width: 16%; text-align: right;  }
+
+    .son-letras {
+        margin-top: 6px;
+        font-size: 8.5pt;
+    }
+
+    /* ---------- BLOQUE INFERIOR: CONDICIONES + TOTALES ---------- */
+    .footer-table {
+        margin-top: 10px;
+    }
+    .condiciones-wrap {
+        border: 1px solid #000000;
+    }
+    .condiciones-box td {
+        font-size: 8.5pt;
+        padding: 4px 6px;
+    }
+    .condiciones-box .label {
+        font-weight: bold;
+        width: 40%;
+    }
+
+    .totales-wrap {
+        border: 1px solid #000000;
+    }
+    .totales-box td {
+        font-size: 9pt;
+        padding: 4px 8px;
+    }
+    .totales-box .t-label {
+        font-weight: bold;
+        text-align: left;
+        width: 45%;
+    }
+    .totales-box .t-simbolo {
+        text-align: center;
+        width: 15%;
+    }
+    .totales-box .t-valor {
+        text-align: right;
+        font-weight: bold;
+        width: 40%;
+    }
+    .totales-box .row-total {
+        background-color: #d9d9d9;
+        font-size: 11pt;
+    }
+    .totales-box .row-desc .t-valor,
+    .totales-box .row-desc .t-label {
+        color: #c00000;
+    }
+
+    .cta-text {
+        margin-top: 10px;
+        font-size: 8.5pt;
+    }
+
+    .bancos-img {
+        margin-top: 8px;
+        width: 100%;
+    }
+
+    /* ---------- FIRMA ---------- */
+    .firma-table {
+        margin-top: 22px;
+    }
+    .firma-table td {
+        text-align: center;
+        font-size: 8.5pt;
+    }
+    .firma-nombre {
+        font-weight: bold;
+        font-size: 9.5pt;
+    }
+</style>
+</head>
+<body>
+
+    <!-- ENCABEZADO -->
+    <table class="header-table">
+        <tr>
+            <td class="logo-cell">
+                <img src="{{ logo_path }}">
+                <div class="empresa-nombre">ANCLAJES Y PERNOS S.A.C.</div>
+            </td>
+            <td style="width:42%;">
+                <div class="empresa-datos">
+                    AV. SANTA ANA NRO 386 OTR. CHACRA CERRO<br/>
+                    LIMA &ndash; LIMA<br/>
+                    Cel: 940 479 303 &ndash; 992 519 846<br/>
+                    Email: Lcachay@importbolts.com &ndash; vtineo@importbolts.com
+                </div>
+            </td>
+            <td style="width:30%;">
+                <div class="ruc-box">R.U.C. 20601850509</div>
+                <div class="cotizacion-box">{{ titulo_documento }}</div>
+                <div class="numero-box">N&deg; {{ codigo_pedido }}</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- DATOS CLIENTE / VENDEDOR -->
+    <div class="datos-wrap">
+    <table class="datos-table">
+        <tr>
+            <td class="label">FECHA</td>
+            <td>: {{ fecha }}</td>
+            <td class="datos-divider"></td>
+            <td class="label">RUC</td>
+            <td>: {{ cliente_ruc }}</td>
+        </tr>
+        <tr>
+            <td class="label">SE&Ntilde;OR</td>
+            <td>: {{ cliente_nombre }}</td>
+            <td class="datos-divider"></td>
+            <td class="label">O/C</td>
+            <td>: {{ orden_compra }}</td>
+        </tr>
+        <tr>
+            <td class="label">DIRECCI&Oacute;N</td>
+            <td>: {{ cliente_direccion_fiscal }}</td>
+            <td class="datos-divider"></td>
+            <td class="label">CEL VEND.</td>
+            <td>: {{ vendedor_celular }}</td>
+        </tr>
+        <tr>
+            <td class="label">ATTE</td>
+            <td>: {{ contacto_atte }}</td>
+            <td class="datos-divider"></td>
+            <td class="label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="label">TEL&Eacute;FONO</td>
+            <td>: {{ cliente_telefono }}</td>
+            <td class="datos-divider"></td>
+            <td class="label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="label">VENDEDOR</td>
+            <td>: {{ vendedor_nombre }}</td>
+            <td class="datos-divider"></td>
+            <td class="label"></td>
+            <td></td>
+        </tr>
+    </table>
+    </div>
+
+    <div class="intro-text">Estimados se&ntilde;ores:</div>
+    <div class="intro-text">Por medio de la presente nos es grato cotizarles lo siguiente:</div>
+
+    <!-- TABLA DE ITEMS -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th class="col-itm">ITM</th>
+                <th class="col-codigo">CODIGO</th>
+                <th class="col-desc">DESCRIPCION</th>
+                <th class="col-um">U.M</th>
+                <th class="col-cant">CANT.</th>
+                <th class="col-unit">P.UNIT</th>
+                <th class="col-total">TOTAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in tbl_contents %}
+            <tr>
+                <td class="col-itm">{{ i.item }}</td>
+                <td class="col-codigo">{{ i.sku }}</td>
+                <td class="col-desc">{{ i.desc }}</td>
+                <td class="col-um">{{ i.um }}</td>
+                <td class="col-cant">{{ i.cant }}</td>
+                <td class="col-unit">{{ i.unit }}</td>
+                <td class="col-total">{{ i.subtotal }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="son-letras">SON: {{ son_letras }}</div>
+
+    <!-- CONDICIONES + TOTALES -->
+    <table class="footer-table">
+        <tr>
+            <td style="width:50%; vertical-align: top;">
+                <div class="condiciones-wrap">
+                <table class="condiciones-box">
+                    <tr>
+                        <td class="label">CONDICION DE PAGO</td>
+                        <td>: {{ condicion_pago }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">VALIDEZ</td>
+                        <td>: {{ validez }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">PLAZO DE ENTREGA</td>
+                        <td>: {{ plazo_entrega }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">LUGAR DE ENTREGA</td>
+                        <td>: {{ lugar_entrega }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">OBSERVACION</td>
+                        <td>: {{ observacion }}</td>
+                    </tr>
+                </table>
+                </div>
+                <div class="cta-text">&iquest;Est&aacute;s listo para trabajar con nosotros?, no dudes en contactarnos.</div>
+            </td>
+            <td style="width:50%; vertical-align: top;">
+                {% if mostrar_precios %}
+                <div class="totales-wrap">
+                <table class="totales-box">
+                    <tr>
+                        <td class="t-label">SUBTOTAL</td>
+                        <td class="t-simbolo">{{ simbolo }}</td>
+                        <td class="t-valor">{{ subtotal_bruto }}</td>
+                    </tr>
+                    <tr class="row-desc">
+                        <td class="t-label">{{ label_descuento }}</td>
+                        <td class="t-simbolo">{{ simbolo }}</td>
+                        <td class="t-valor">{{ monto_descuento }}</td>
+                    </tr>
+                    <tr>
+                        <td class="t-label">VALOR VENTA</td>
+                        <td class="t-simbolo">{{ simbolo }}</td>
+                        <td class="t-valor">{{ subtotal_neto }}</td>
+                    </tr>
+                    <tr>
+                        <td class="t-label">IGV (18%)</td>
+                        <td class="t-simbolo">{{ simbolo }}</td>
+                        <td class="t-valor">{{ igv }}</td>
+                    </tr>
+                    <tr class="row-total">
+                        <td class="t-label">TOTAL</td>
+                        <td class="t-simbolo">{{ simbolo }}</td>
+                        <td class="t-valor">{{ total }}</td>
+                    </tr>
+                </table>
+                </div>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <img class="bancos-img" src="{{ bancos_path }}">
+
+    <!-- FIRMA -->
+    <table class="firma-table">
+        <tr>
+            <td style="width:50%;"></td>
+            <td style="width:50%;">
+                <div class="firma-nombre">{{ vendedor_nombre }}</div>
+                <div>{{ vendedor_cargo }}</div>
+                <div>{{ vendedor_email }}</div>
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

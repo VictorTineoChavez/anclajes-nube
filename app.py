@@ -31,6 +31,7 @@ from xhtml2pdf import pisa
 
 
 
+
 def hora_peru():
     # Obtiene la hora exacta de Lima, pero le quita la 'etiqueta' de zona horaria (.replace)
     # para que sea 100% compatible con la base de datos (offset-naive)
@@ -1456,6 +1457,179 @@ def descargar_cotizacion(order_id):
                 mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             )
 
+
+@app.route('/descargar_cotizacion_v2/<int:order_id>')
+def descargar_cotizacion_v2(order_id):
+    orden = Order.query.get_or_404(order_id)
+    vendedor = orden.vendedor
+ 
+    # --- A. LÓGICA DE PLANTILLA Y MODO (igual que tu ruta original) ---
+    modo = request.args.get('modo', 'default')
+    es_aprobado = orden.estado in ['Aprobado', 'Despachado', 'Entregado']
+ 
+    titulo_doc = "COTIZACIÓN"
+    codigo_visual = f"COT-{orden.id:05d}"
+    mostrar_precios = True
+ 
+    if es_aprobado:
+        titulo_doc = "ORDEN DE PEDIDO"
+        codigo_visual = f"OP-{orden.id:05d}"
+        if modo == 'almacen':
+            mostrar_precios = False
+            titulo_doc += " (ALMACÉN)"
+ 
+    # --- B. PROCESAMIENTO DE DATOS (igual que tu lógica original) ---
+    cargo_mostrar = vendedor.cargo_formal if vendedor.cargo_formal else "Asesor Comercial"
+    email_texto = vendedor.email_empresa if vendedor.email_empresa else "ventas@importbolts.com"
+    celular_texto = vendedor.celular if vendedor.celular else ""
+ 
+    subtotal_bruto = orden.subtotal + orden.descuento_total
+ 
+    texto_entrega = "Inmediata / A coordinar"
+    if orden.fecha_entrega:
+        texto_entrega = orden.fecha_entrega.strftime("%d/%m/%Y")
+ 
+    simbolo = "S/" if orden.moneda == 'PEN' else "$"
+    nombre_moneda = "SOLES" if orden.moneda == 'PEN' else "DOLARES AMERICANOS"
+ 
+    # Procesamiento de Items (sin RichText, ahora HTML simple con <b>)
+    lista_items = []
+    i = 1
+ 
+    for d in orden.details:
+        sku_final = "SERV"
+        if d.product:
+            sku_final = d.product.sku
+        elif d.item_type == 'FABRICACION':
+            mapa_skus = {
+                'SERVICIO DE CORTE': 'SRV-CORT',
+                'SERVICIO DE SOLDADURA': 'SRV-SOLD',
+                'SERVICIO DE GALVANIZADO': 'SRV-GALV',
+                'SERVICIO DE ZINCADO': 'SRV-ZINC',
+                'SERVICIO DE ROSCADO': 'SRV-ROSC',
+                'SERVICIO DE TROPICALIZADO': 'SRV-TROP',
+                'SERVICIO GENERAL': 'SRV-GEN'
+            }
+            titulo_limpio = d.nombre_personalizado_titulo.upper() if d.nombre_personalizado_titulo else ""
+            sku_final = mapa_skus.get(titulo_limpio, 'SRV-GEN')
+ 
+            if sku_final == 'SRV-GEN':
+                prod_db = Product.query.filter_by(nombre=titulo_limpio).first()
+                if prod_db:
+                    sku_final = prod_db.sku
+ 
+        elif d.item_type == 'GLB':
+            sku_final = "GLB-001"
+ 
+        if d.product and d.item_type == 'PRODUCTO':
+            descripcion_html = d.product.nombre
+        else:
+            titulo = d.nombre_personalizado_titulo.upper() if d.nombre_personalizado_titulo else ""
+            cuerpo = d.nombre_personalizado.upper() if d.nombre_personalizado else ""
+            partes = []
+            if titulo:
+                partes.append(f"<b>{titulo}</b>")
+            if cuerpo:
+                partes.append(cuerpo)
+            descripcion_html = " ".join(partes)
+ 
+        unidad_final = "UND"
+        if d.item_type == 'FABRICACION':
+            unidad_final = "SRV"
+        elif d.item_type == 'GLB':
+            unidad_final = "GLB"
+        elif d.product and hasattr(d.product, 'unidad_medida'):
+            unidad_final = d.product.unidad_medida or "UND"
+ 
+        lista_items.append({
+            'item': i,
+            'sku': sku_final,
+            'um': unidad_final,
+            'desc': descripcion_html,
+            'cant': d.cantidad,
+            'unit': f"{d.precio_aplicado:,.2f}",
+            'subtotal': f"{d.subtotal:,.2f}"
+        })
+        i += 1
+ 
+    # Conversión a letras
+    try:
+        total_float = float(orden.total)
+        parte_entera = int(total_float)
+        parte_decimal = int(round((total_float - parte_entera) * 100))
+        letras = num2words(parte_entera, lang='es').upper()
+        total_letras = f"{letras} CON {parte_decimal:02d}/100 {nombre_moneda}"
+    except Exception:
+        total_letras = "---"
+ 
+    # --- C. CONTEXTO PARA LA PLANTILLA HTML ---
+    logo_path = os.path.join(app.root_path, 'static', 'img', 'logo.png')
+    bancos_path = os.path.join(app.root_path, 'static', 'img', 'bancos.png')
+ 
+    context = {
+        'titulo_documento': titulo_doc,
+        'codigo_pedido': codigo_visual,
+        'mostrar_precios': mostrar_precios,
+        'fecha': orden.fecha.strftime("%d/%m/%Y"),
+        'cliente_nombre': orden.cliente.nombre,
+        'cliente_ruc': orden.cliente.documento,
+        'cliente_direccion_fiscal': orden.cliente.direccion,
+        'cliente_telefono': orden.cliente.telefono or "",
+        'contacto_atte': orden.atencion or "",
+        'orden_compra': orden.orden_compra or "",
+        'vendedor_celular': celular_texto,
+        'tipo_entrega': orden.tipo_entrega,
+        'lugar_entrega': orden.direccion_envio,
+        'plazo_entrega': texto_entrega,
+        'vendedor_nombre': orden.vendedor.nombre_completo,
+        'vendedor_cargo': cargo_mostrar,
+        'vendedor_email': email_texto,
+        'tbl_contents': lista_items,
+        'simbolo': simbolo,
+        'subtotal_bruto': f"{subtotal_bruto:,.2f}",
+        'label_descuento': f"DESCUENTO ({int(orden.descuento_valor)}%)" if orden.descuento_tipo == 'PORCENTAJE' else "DESCUENTO",
+        'monto_descuento': f"- {orden.descuento_total:,.2f}",
+        'subtotal_neto': f"{orden.subtotal:,.2f}",
+        'igv': f"{orden.igv:,.2f}",
+        'total': f"{orden.total:,.2f}",
+        'son_letras': total_letras,
+        'condicion_pago': orden.condicion_pago or "Contado",
+        'validez': orden.validez_oferta or "5 días",
+        'observacion': orden.observacion or "",
+        'logo_path': logo_path,
+        'bancos_path': bancos_path,
+    }
+ 
+    # --- D. RENDERIZAR HTML CON JINJA2 ---
+    html_renderizado = render_template('pdf_cotizacion.html', **context)
+ 
+    # --- E. CONVERTIR HTML -> PDF CON xhtml2pdf ---
+    pdf_buffer = io.BytesIO()
+    resultado = pisa.CreatePDF(
+        src=html_renderizado,
+        dest=pdf_buffer,
+        encoding='utf-8'
+    )
+ 
+    if resultado.err:
+        # Si algo falla, te muestro el HTML crudo en el navegador para depurar
+        return f"<h2>Error generando PDF (v2)</h2><pre>{html_renderizado}</pre>", 500
+ 
+    pdf_buffer.seek(0)
+ 
+    suffix = "_ALMACEN" if modo == 'almacen' else ""
+    nombre_archivo_base = f"{codigo_visual}_{orden.cliente.nombre[:10]}{suffix}_V2"
+    nombre_archivo_base = "".join(
+        c for c in nombre_archivo_base if c.isalnum() or c in (' ', '.', '-', '_')
+    ).strip()
+ 
+    return send_file(
+        pdf_buffer,
+        as_attachment=True,
+        download_name=f"{nombre_archivo_base}.pdf",
+        mimetype='application/pdf'
+    )
+ 
 
 @app.route('/descargar_nota_pedido/<int:order_id>')
 def descargar_nota_pedido(order_id):
