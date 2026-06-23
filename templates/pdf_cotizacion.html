@@ -12,32 +12,33 @@
         font-size: 9pt;
         color: #000000;
     }
-    table {
-        width: 100%;
-    }
     td {
         vertical-align: top;
         padding: 2px;
     }
     /* xhtml2pdf no soporta border-collapse: los bordes se definen por celda */
-
+ 
     /* ---------- ENCABEZADO ---------- */
+    .header-table {
+        width: 540pt;
+    }
     .header-table td {
         vertical-align: middle;
         padding: 0;
     }
     .logo-cell {
-        width: 28%;
+        width: 150pt;
         text-align: center;
     }
     .logo-cell img {
-        width: 70px;
+        width: 55px;
     }
     .empresa-nombre {
-        font-size: 12pt;
+        font-size: 10pt;
         font-weight: bold;
         color: #1a1a1a;
         text-align: center;
+        margin-top: 3px;
     }
     .empresa-datos {
         font-size: 7.5pt;
@@ -68,11 +69,15 @@
         font-weight: bold;
         font-size: 10pt;
     }
-
+ 
     /* ---------- DATOS CLIENTE / VENDEDOR ---------- */
     .datos-wrap {
         border: 1px solid #000000;
         margin-top: 10px;
+        width: 540pt;
+    }
+    .datos-table {
+        width: 540pt;
     }
     .datos-table td {
         font-size: 8.5pt;
@@ -80,85 +85,101 @@
     }
     .datos-table .label {
         font-weight: bold;
-        width: 18%;
+        width: 95pt;
     }
     .datos-divider {
-        width: 1%;
+        width: 6pt;
         border-left: 1px solid #000000;
     }
-
+ 
     .intro-text {
         margin-top: 10px;
         margin-bottom: 6px;
         font-size: 9pt;
     }
-
+ 
     /* ---------- TABLA DE ITEMS ---------- */
+    /* Ancho de página util: letter (612pt) - margenes (1.2cm+1.3cm ~ 68pt) = ~544pt */
+    /* Usamos anchos fijos en pt para que reportlab no calcule negativo con el padding */
     .items-table {
         border: 1px solid #000000;
+        width: 540pt;
     }
     .items-table th {
         background-color: #d9d9d9;
         border: 1px solid #000000;
         font-size: 8pt;
         text-transform: uppercase;
-        padding: 4px 3px;
+        padding: 3px 2px;
         text-align: center;
     }
     .items-table td {
         border: 1px solid #000000;
         font-size: 8.5pt;
-        padding: 4px 3px;
+        padding: 3px 2px;
     }
-    .col-itm    { width: 5%;  text-align: center; }
-    .col-codigo { width: 12%; text-align: center; }
-    .col-desc   { width: 38%; text-align: left;   }
-    .col-um     { width: 7%;  text-align: center; }
-    .col-cant   { width: 8%;  text-align: center; }
-    .col-unit   { width: 14%; text-align: right;  }
-    .col-total  { width: 16%; text-align: right;  }
-
+    .col-itm    { width: 28pt;  text-align: center; }
+    .col-codigo { width: 60pt;  text-align: center; }
+    .col-desc   { width: 195pt; text-align: left;   }
+    .col-um     { width: 35pt;  text-align: center; }
+    .col-cant   { width: 40pt;  text-align: center; }
+    .col-unit   { width: 85pt;  text-align: right;  }
+    .col-total  { width: 85pt;  text-align: right;  }
+ 
     .son-letras {
         margin-top: 6px;
         font-size: 8.5pt;
     }
-
+ 
     /* ---------- BLOQUE INFERIOR: CONDICIONES + TOTALES ---------- */
     .footer-table {
         margin-top: 10px;
+        width: 540pt;
+    }
+    .footer-table > tr > td {
+        width: 270pt;
+        padding: 0 4px;
     }
     .condiciones-wrap {
         border: 1px solid #000000;
+        width: 255pt;
+    }
+    .condiciones-box {
+        width: 255pt;
     }
     .condiciones-box td {
         font-size: 8.5pt;
-        padding: 4px 6px;
+        padding: 3px 5px;
     }
     .condiciones-box .label {
         font-weight: bold;
-        width: 40%;
+        width: 100pt;
     }
-
+ 
     .totales-wrap {
         border: 1px solid #000000;
+        width: 255pt;
+    }
+    .totales-box {
+        width: 255pt;
     }
     .totales-box td {
         font-size: 9pt;
-        padding: 4px 8px;
+        padding: 3px 5px;
     }
     .totales-box .t-label {
         font-weight: bold;
         text-align: left;
-        width: 45%;
+        width: 115pt;
     }
     .totales-box .t-simbolo {
         text-align: center;
-        width: 15%;
+        width: 35pt;
     }
     .totales-box .t-valor {
         text-align: right;
         font-weight: bold;
-        width: 40%;
+        width: 105pt;
     }
     .totales-box .row-total {
         background-color: #d9d9d9;
@@ -168,24 +189,26 @@
     .totales-box .row-desc .t-label {
         color: #c00000;
     }
-
+ 
     .cta-text {
         margin-top: 10px;
         font-size: 8.5pt;
     }
-
+ 
     .bancos-img {
         margin-top: 8px;
-        width: 100%;
+        width: 540pt;
     }
-
+ 
     /* ---------- FIRMA ---------- */
     .firma-table {
         margin-top: 22px;
+        width: 540pt;
     }
     .firma-table td {
         text-align: center;
         font-size: 8.5pt;
+        width: 270pt;
     }
     .firma-nombre {
         font-weight: bold;
@@ -194,7 +217,7 @@
 </style>
 </head>
 <body>
-
+ 
     <!-- ENCABEZADO -->
     <table class="header-table">
         <tr>
@@ -202,7 +225,7 @@
                 <img src="{{ logo_path }}">
                 <div class="empresa-nombre">ANCLAJES Y PERNOS S.A.C.</div>
             </td>
-            <td style="width:42%;">
+            <td style="width:230pt;">
                 <div class="empresa-datos">
                     AV. SANTA ANA NRO 386 OTR. CHACRA CERRO<br/>
                     LIMA &ndash; LIMA<br/>
@@ -210,14 +233,14 @@
                     Email: Lcachay@importbolts.com &ndash; vtineo@importbolts.com
                 </div>
             </td>
-            <td style="width:30%;">
+            <td style="width:160pt;">
                 <div class="ruc-box">R.U.C. 20601850509</div>
                 <div class="cotizacion-box">{{ titulo_documento }}</div>
                 <div class="numero-box">N&deg; {{ codigo_pedido }}</div>
             </td>
         </tr>
     </table>
-
+ 
     <!-- DATOS CLIENTE / VENDEDOR -->
     <div class="datos-wrap">
     <table class="datos-table">
@@ -265,10 +288,10 @@
         </tr>
     </table>
     </div>
-
+ 
     <div class="intro-text">Estimados se&ntilde;ores:</div>
     <div class="intro-text">Por medio de la presente nos es grato cotizarles lo siguiente:</div>
-
+ 
     <!-- TABLA DE ITEMS -->
     <table class="items-table">
         <thead>
@@ -296,13 +319,13 @@
             {% endfor %}
         </tbody>
     </table>
-
+ 
     <div class="son-letras">SON: {{ son_letras }}</div>
-
+ 
     <!-- CONDICIONES + TOTALES -->
     <table class="footer-table">
         <tr>
-            <td style="width:50%; vertical-align: top;">
+            <td style="vertical-align: top;">
                 <div class="condiciones-wrap">
                 <table class="condiciones-box">
                     <tr>
@@ -329,7 +352,7 @@
                 </div>
                 <div class="cta-text">&iquest;Est&aacute;s listo para trabajar con nosotros?, no dudes en contactarnos.</div>
             </td>
-            <td style="width:50%; vertical-align: top;">
+            <td style="vertical-align: top;">
                 {% if mostrar_precios %}
                 <div class="totales-wrap">
                 <table class="totales-box">
@@ -364,20 +387,20 @@
             </td>
         </tr>
     </table>
-
+ 
     <img class="bancos-img" src="{{ bancos_path }}">
-
+ 
     <!-- FIRMA -->
     <table class="firma-table">
         <tr>
-            <td style="width:50%;"></td>
-            <td style="width:50%;">
+            <td></td>
+            <td>
                 <div class="firma-nombre">{{ vendedor_nombre }}</div>
                 <div>{{ vendedor_cargo }}</div>
                 <div>{{ vendedor_email }}</div>
             </td>
         </tr>
     </table>
-
+ 
 </body>
 </html>
