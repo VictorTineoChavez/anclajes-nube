@@ -3163,20 +3163,18 @@ def procesar_salida_almacen(order_id):
 @app.route('/setup_db_secreta')
 def setup_db_secreta():
     try:
-        db.create_all()
-        # Verificamos si ya existe el admin para no duplicarlo
-        admin_existe = User.query.filter_by(username='admin').first()
-        if not admin_existe:
-            admin = User(
-                username='admin', 
-                password=generate_password_hash('123456'), 
-                nombre_completo='Administrador General', 
-                role='admin'
-            )
-            db.session.add(admin)
+        # Esto crea tablas nuevas si no existen
+        db.create_all() 
+        
+        # Esto fuerza la creación de la columna estado si no existe
+        # (Esto es lo que te estaba dando el error 500)
+        try:
+            db.session.execute(text("ALTER TABLE product ADD COLUMN estado VARCHAR(50);"))
             db.session.commit()
-            return "<h1>¡Éxito!</h1><p>Base de datos inicializada y usuario admin creado.</p>"
-        return "<h1>Aviso</h1><p>La base de datos ya estaba inicializada.</p>"
+        except:
+            db.session.rollback() # Si ya existe, no hace nada y sigue
+            
+        return "<h1>Mantenimiento realizado.</h1><p>Intenta entrar a tu página nuevamente.</p>"
     except Exception as e:
         return f"<h1>Error</h1><p>{str(e)}</p>"
 
