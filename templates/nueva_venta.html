@@ -3105,11 +3105,14 @@ function renderizarTabla() {
             inputClass = 'editable-cell text-danger fw-bold border-danger bg-danger bg-opacity-10'; 
         }
 
+        // --- CORRECCIÓN: Dibuja la etiqueta roja de descuento SOLO si realmente existe un descuento ---
+        let badgeDescHtml = (item.desc_label && item.desc_label !== '') ? `<br><span class="badge bg-danger mt-1">${item.desc_label}</span>` : '';
+
         tbody.append(`
             <tr id="fila-${index}">
                 <td class="ps-3">
                     <div class="product-name-cell" style="font-size: 0.85rem;">
-                        ${nombreHtml} ${etiquetaTipo} <br> <span class="badge bg-danger mt-1">${item.desc_label}</span>
+                        ${nombreHtml} ${etiquetaTipo} ${badgeDescHtml}
                     </div>
                     <div class="small text-muted fw-light">${item.sku}</div>
                     <span id="badge_stock_${index}" class="badge bg-danger ms-1" style="font-size:0.6rem; display:${badgeDisplay};">
